@@ -9,14 +9,25 @@ def parsed_package_from_filename(filename):
     return parsed
 
 
+class Use:
+
+    def __init__(self, library, design_unit, name_within, package=None):
+        self.library = library
+        self.design_unit = design_unit
+        self.name_within = name_within
+        self.package = package
+
+
 def get_parsed_package_dependencies(parsed):
-    uses = set()
+    uses = {}
     for reference in parsed.references:
         if reference.design_unit in uses:
             raise Exception('Two packages with same name.')
-        uses.add(reference.design_unit)
         if reference.name_within != 'all':
             raise Exception("Can't deal with use statements that don't use 'all'")
+        uses[reference.design_unit] = Use(
+            library=reference.library, design_unit=reference.design_unit,
+            name_within=reference.name_within)
     return uses
 
 
@@ -59,7 +70,7 @@ def process_packages(filenames):
     while toresolve_package_names:
         any_resolved = False
         for pn in toresolve_package_names:
-            dependencies = pd[pn].uses
+            dependencies = pd[pn].uses.keys()
             if not (set(dependencies) - set(resolved_package_names)):
                 resolved = pd[pn].resolve(resolved_pd)
                 any_resolved = True
@@ -118,12 +129,17 @@ def resolve_dependencies(available, unresolved, dependencies, resolve_function):
 
 def resolve_uses(uses, packages):
     resolved_uses = {}
-    for use in uses:
-        if use not in packages:
-            raise Exception('Did not find dependency package {}'.format(use))
-        if not packages[use].resolved:
-            raise Exception('Dependency package {} is not resolved'.format(use))
-        resolved_uses[use] = packages[use]
+    for use_name, use in uses.items():
+        if use_name not in packages:
+            raise Exception('Did not find dependency package {}'.format(use_name))
+        if not packages[use_name].resolved:
+            raise Exception('Dependency package {} is not resolved'.format(use_name))
+        resolved_uses[use_name] = Use(
+            library=use.library,
+            design_unit=use.design_unit,
+            name_within=use.name_within,
+            package=packages[use_name],
+            )
     return resolved_uses
 
 
@@ -137,7 +153,8 @@ class UnresolvedPackage:
 
     def resolve(self, packages):
         resolved_uses = resolve_uses(self.uses, packages)
-        available_types, available_constants = combine_packages(resolved_uses.values())
+        available_types, available_constants = combine_packages(
+            [u.package for u in resolved_uses.values()])
 
         def resolve_constant(name, constant, resolved_constants):
             resolved = symbolic_math.make_substitute_function(

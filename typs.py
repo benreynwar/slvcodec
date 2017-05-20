@@ -1,6 +1,18 @@
 from slvcodec import symbolic_math
 
 
+class UnresolvedConstant:
+
+    def __init__(self, name):
+        self.name = name
+
+    def value(self):
+        raise Exception('Constant {} is not resolved'.format(self.name))
+
+    def str_expression(self):
+        return self.name
+
+
 class Constant:
 
     def __init__(self, name, expression):
@@ -9,6 +21,9 @@ class Constant:
 
     def value(self):
         return symbolic_math.get_value(self.expression)
+
+    def str_expression(self):
+        return self.name
 
 
 def resolve_expression(e, constants):
@@ -27,6 +42,9 @@ class StdLogic:
 
     width = 1
     resolved = True
+
+    def __str__(self):
+        return 'std_logic'
 
     def to_slv(self, data):
         assert(data in (0, 1))
@@ -81,6 +99,11 @@ class ConstrainedArray:
         self.size = size
         self.width = symbolic_math.Multiplication(
             [self.size, self.unconstrained_type.subtype.width], [])
+
+    def __str__(self):
+        s = '{}({}-1 downto 0)'.format(
+            self.unconstrained_type.identifier, symbolic_math.str_expression(self.size))
+        return s
 
     def to_slv(self, data):
         assert(len(data) == self.size.value())
@@ -149,6 +172,11 @@ class ConstrainedStdLogicVector:
         self.min_value = 0
         self.max_value = pow(2, self.size.value())-1
         self.width = size
+
+    def __str__(self):
+        s = 'std_logic_vector({}-1 downto 0)'.format(
+            symbolic_math.str_expression(self.size))
+        return s
 
     def to_slv(self, data):
         assert(data >= self.min_value)
@@ -274,6 +302,9 @@ class Record:
         self.width = symbolic_math.simplify(symbolic_math.Addition(
             expressions=subtype_widths, numbers=[1]*len(subtype_widths)))
 
+    def __str__(self):
+        return self.identifier
+
     def to_slv(self, data):
         slvs = [
             subtype.to_slv(data[name]) for name, subtype in self.names_and_subtypes]
@@ -291,3 +322,11 @@ class Record:
         data, reduced_slv = self.reduce_slv(slv)
         assert(reduced_slv == '')
         return data
+
+    def declaration(self):
+        lines = ['type {} is'.format(self.identifier)]
+        lines += ['record']
+        for name, subtype in self.names_and_subtypes:
+            lines += ['    {}: {};'.format(name, subtype)]
+        lines += ['end record;']
+        return '\n'.join(lines)

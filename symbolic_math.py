@@ -49,6 +49,18 @@ def collect(item, f):
     return collected
 
 
+def str_expression(item):
+    if isinstance(item, str):
+        o = item
+    elif isinstance(item, int):
+        o = str(item)
+    elif hasattr(item, 'str_expression'):
+        o = item.str_expression()
+    else:
+        raise Exception('Cannot use str_expression on {}'.format(item))
+    return o
+
+
 def get_constant_list(item):
     if isinstance(item, str):
         collected = [item]
@@ -142,6 +154,9 @@ class Expression(ExpressionBase):
 
     def value(self):
         raise Exception('Cannot get value of a unparsed expression.')
+
+    def str_expression(self):
+        return ' '.join([str_expression(item) for item in self.items])
 
     def parse_parentheses(self):
         open_braces = 0
@@ -251,6 +266,15 @@ class Multiplication(MultiplicationBase):
             result /= d
         return result
 
+    def str_expression(self):
+        numerator = '*'.join([str_expression(item) for item in self.numerators])
+        if self.denominators:
+            denominator = '/'.join([str_expression(item) for item in self.denominators])
+            s = '{}/{}'.format(numerator, denominator)
+        else:
+            s = numerator
+        return s
+
     def simplify_multiplication(self):
         numerators = [transform(item, simplify_multiplication)
                       for item in self.numerators]
@@ -341,6 +365,27 @@ class Addition(AdditionBase):
         values = [get_value(item) for item in self.expressions]
         result = sum(values)
         return result
+
+    def str_expression(self):
+        s = '('
+        first = True
+        for n, e in zip(self.numbers, self.expressions):
+            if n == -1:
+                prefix = '-'
+            elif n == 1:
+                if first:
+                    prefix = ''
+                else:
+                    prefix = '+'
+            else:
+                if first:
+                    prefix = '{}*'.format(str(n))
+                else:
+                    prefix = '+{}*'.format(str(n))
+            s += prefix + str_expression(e)
+            first = False
+        s += ')'
+        return s
 
     @staticmethod
     def from_items(items):
@@ -464,6 +509,14 @@ def test_constant_list():
     assert(set(constants) == set(['fish', 'bear']))
 
 
+def test_str_expression():
+    string = '3 * (fish + 6) - 2 * bear + 2*avo - avo - avo'
+    print(string)
+    simplified = parse_and_simplify(string)
+    s = str_expression(simplified)
+    print(s)
+
+
 def test_integer():
     string = '4'
     simplified = parse_and_simplify(string)
@@ -471,6 +524,8 @@ def test_integer():
 
 
 if __name__ == '__main__':
+    test_str_expression()
+    exit()
     test_integer()
     test_multiplication()
     test_multiplication2()
