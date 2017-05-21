@@ -23,9 +23,9 @@ def get_size(typ):
     else:
         left_expression = symbolic_math.string_to_expression(typ.range1.left)
         right_expression = symbolic_math.string_to_expression(typ.range1.right)
-        size = symbolic_math.simplify(symbolic_math.Addition(
-            expressions=[left_expression, 1, right_expression],
-            numbers=[1, 1, -1]))
+        size = symbolic_math.simplify(symbolic_math.Addition([
+            symbolic_math.Term(number=n, expression=e) for n ,e in
+            ((1, left_expression), (1, 1), (-1, right_expression))]))
     return size
 
 

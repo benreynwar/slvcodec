@@ -6,11 +6,11 @@ from vunit import vhdl_parser
 from slvcodec import typs, package, symbolic_math
 
 declarations_template = '''  constant {type.identifier}_width: natural := {width_expression};
-  function to_slv (constant data: {type.identifier}) return std_logic_vector;
-  function from_slv (constant slv: std_logic_vector) return {type.identifier};'''
+  function to_slvcodec (constant data: {type.identifier}) return std_logic_vector;
+  function from_slvcodec (constant slv: std_logic_vector) return {type.identifier};'''
 
-unconstrained_declarations_template = '''  function to_slv (constant data: {type.identifier}) return std_logic_vector;
-  function from_slv (constant slv: std_logic_vector) return {type.identifier};'''
+unconstrained_declarations_template = '''  function to_slvcodec (constant data: {type.identifier}) return std_logic_vector;
+  function from_slvcodec (constant slv: std_logic_vector) return {type.identifier};'''
 
 constrained_declarations_template = '''  constant {type.identifier}_width: natural := {width_expression};'''
 
@@ -83,6 +83,7 @@ def make_slvcodec_package(pkg):
             use.library, use.design_unit, use.name_within))
         if use.library not in libraries:
             libraries.append(use.library)
+    use_lines.append('use ieee.numeric_std.all;'.format(pkg.identifier))
     use_lines.append('use work.{}.all;'.format(pkg.identifier))
     use_lines.append('use work.slvcodec.all;'.format(pkg.identifier))
     library_lines = ['library {};'.format(library) for library in libraries]

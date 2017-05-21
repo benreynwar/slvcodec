@@ -1,10 +1,12 @@
 library ieee;
 use ieee.std_logic_1164.all;
+use work.slvcodec.all;
 {{use_clauses}}
 
 entity FileTestBench is
   generic (
     {{generic_params}}
+    CLOCK_PERIOD: time;
     DATAINFILENAME: string;
     DATAOUTFILENAME: string
   );
@@ -20,8 +22,8 @@ architecture arch of FileTestBench is
   signal offset_clk: std_logic;
 begin
 
-  input_data <= from_slv(input_slv);
-  output_data <= to_slv(output_slv);
+  input_data <= from_slvcodec(input_slv);
+  output_slv <= to_slvcodec(output_data);
 
   file_reader: entity work.ReadFile
     generic map(FILENAME => DATAINFILENAME,
@@ -50,7 +52,7 @@ begin
   dut: entity work.{{dut_name}}
     generic map(
       {{dut_generics}}
-      );
+      )
     port map(clk => clk,
              {{connections}}
              );

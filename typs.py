@@ -299,8 +299,8 @@ class Record:
         self.identifier = identifier
         self.names_and_subtypes = names_and_subtypes
         subtype_widths = [subtype.width for name, subtype in names_and_subtypes]
-        self.width = symbolic_math.simplify(symbolic_math.Addition(
-            expressions=subtype_widths, numbers=[1]*len(subtype_widths)))
+        self.width = symbolic_math.simplify(symbolic_math.Addition([
+            symbolic_math.Term(number=1, expression=e) for e in subtype_widths]))
 
     def __str__(self):
         return self.identifier
