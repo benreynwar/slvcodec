@@ -141,6 +141,18 @@ class Array:
         self.identifier = identifier
         self.subtype = subtype
 
+    def to_slv(self, data):
+        slv = ''.join([self.subtype.to_slv(d) for d in data])
+        return slv
+
+    def from_slv(self, slv):
+        w = symbolic_math.get_value(self.subtype.width)
+        n = len(slv)/w
+        assert(n * w == len(slv))
+        slv_pieces = [slv[i*w: (i+1)*w] for i in range(n)]
+        data = [self.subtype.from_slv(piece) for piece in slv_pieces]
+        return data
+
 
 class StdLogicVector(Array):
 
@@ -169,8 +181,6 @@ class ConstrainedStdLogicVector:
     def __init__(self, identifier, size):
         self.identifier = identifier
         self.size = size
-        self.min_value = 0
-        self.max_value = pow(2, self.size.value())-1
         self.width = size
 
     def __str__(self):
@@ -179,10 +189,13 @@ class ConstrainedStdLogicVector:
         return s
 
     def to_slv(self, data):
-        assert(data >= self.min_value)
-        assert(data <= self.max_value)
+        size_value = symbolic_math.get_value(self.size)
+        min_value = 0
+        max_value = pow(2, size_value)-1
+        assert(data >= min_value)
+        assert(data <= max_value)
         bits = []
-        for i in range(self.size.value()):
+        for i in range(size_value):
             bits.append(data % 2)
             data = data >> 1
         assert(data == 0)

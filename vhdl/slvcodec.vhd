@@ -17,13 +17,17 @@ package body slvcodec is
 
   -- std_logic_vector
   function to_slvcodec(constant data: std_logic_vector) return std_logic_vector is
+    variable mapped: std_logic_vector(data'length-1 downto 0);
   begin
-    return data;
+      mapped := data;
+      return mapped;
   end function;
 
   function from_slvcodec(constant data: std_logic_vector) return std_logic_vector is
+    variable mapped: std_logic_vector(data'length-1 downto 0);
   begin
-    return data;
+    mapped := data;
+    return mapped;
   end function;
 
   -- std_logic
@@ -35,9 +39,11 @@ package body slvcodec is
   end function;
     
   function from_slvcodec(constant data: std_logic_vector) return std_logic is
+    variable mapped: std_logic_vector(0 downto 0);
     variable output: std_logic;
   begin
-    output := data(0);
+    mapped := data;
+    output := mapped(0);
     return output;
   end function;
 

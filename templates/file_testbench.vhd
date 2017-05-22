@@ -3,23 +3,25 @@ use ieee.std_logic_1164.all;
 use work.slvcodec.all;
 {{use_clauses}}
 
-entity FileTestBench is
+entity {{test_name}} is
   generic (
     {{generic_params}}
-    CLOCK_PERIOD: time;
-    DATAINFILENAME: string;
-    DATAOUTFILENAME: string
+    RUNNER_CFG: string;
+    CLOCK_PERIOD: time := 10 ns;
+    DATAINFILENAME: string := "blah.dat";
+    DATAOUTFILENAME: string := "blahout.dat"
   );
-end FileTestBench;
+end entity;
  
-architecture arch of FileTestBench is
+architecture arch of {{test_name}} is
   {{definitions}}
   signal input_data: t_input;
   signal output_data: t_output;
   signal input_slv: std_logic_vector(t_input_width-1 downto 0);
   signal output_slv: std_logic_vector(t_output_width-1 downto 0);
   signal clk: std_logic;
-  signal offset_clk: std_logic;
+  signal read_clk: std_logic;
+  signal write_clk: std_logic;
 begin
 
   input_data <= from_slvcodec(input_slv);
@@ -27,14 +29,15 @@ begin
 
   file_reader: entity work.ReadFile
     generic map(FILENAME => DATAINFILENAME,
+                PASSED_RUNNER_CFG => RUNNER_CFG,
                 WIDTH => t_input_width)
-    port map(clk => offset_clk,
+    port map(clk => read_clk,
              out_data => input_slv);
 
   file_writer: entity work.WriteFile
     generic map(FILENAME => DATAOUTFILENAME,
                 WIDTH => t_output_width)
-    port map(clk => clk,
+    port map(clk => write_clk,
              in_data => output_slv);
 
   clock_generator: entity work.ClockGenerator
@@ -43,11 +46,17 @@ begin
                 )
     port map(clk => clk);
 
-  offset_clock_generator: entity work.ClockGenerator
+  read_clock_generator: entity work.ClockGenerator
     generic map(CLOCK_PERIOD => CLOCK_PERIOD,
                 CLOCK_OFFSET => CLOCK_PERIOD/10
                 )
-    port map(clk => offset_clk);
+    port map(clk => read_clk);
+
+  write_clock_generator: entity work.ClockGenerator
+    generic map(CLOCK_PERIOD => CLOCK_PERIOD,
+                CLOCK_OFFSET => 4*CLOCK_PERIOD/10
+                )
+    port map(clk => write_clk);
 
   dut: entity work.{{dut_name}}
     generic map(
@@ -57,4 +66,4 @@ begin
              {{connections}}
              );
  
-end arch;
+end architecture;

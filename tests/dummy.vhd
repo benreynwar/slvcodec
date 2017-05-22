@@ -19,5 +19,6 @@ end entity;
 
 architecture arch of dummy is
 begin
+  o_data <= (others => (others => '0'));
 end architecture;
 

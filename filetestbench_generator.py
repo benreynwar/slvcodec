@@ -43,6 +43,7 @@ def make_filetestbench(entity):
     dut_generics = ',\n'.join(['{} => {}'.format(g.name, g.name)
                                for g in entity.generics.values()])
     filetestbench = filetestbench_template.render(
+        test_name='{}_tb'.format(entity.identifier),
         use_clauses=use_clauses,
         generic_params=generic_params,
         definitions=definitions,
@@ -61,7 +62,7 @@ def prepare_files(directory, entity_file, package_files):
     new_fns = []
     # Make file testbench
     ftb = make_filetestbench(resolved_entity)
-    ftb_fn = os.path.join(directory, '{}_filetestbench.vhd'.format(
+    ftb_fn = os.path.join(directory, '{}_tb.vhd'.format(
         resolved_entity.identifier))
     with open(ftb_fn, 'w') as f:
         f.write(ftb)
@@ -77,7 +78,7 @@ def prepare_files(directory, entity_file, package_files):
         with open(slvcodec_package_filename, 'w') as f:
             f.write(slvcodec_pkg)
         new_fns.append(slvcodec_package_filename)
-    return new_fns
+    return new_fns, resolved_entity
 
 
 if __name__ == '__main__':

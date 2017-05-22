@@ -94,11 +94,17 @@ def process_subtype_indication(subtype_indication):
     if not constraint:
         subtype = type_mark
     else:
-        subtype = typs.UnresolvedConstrainedArray(
-            identifier=None,
-            unconstrained_type_identifier=type_mark,
-            size=get_constraint_size(constraint),
-            )
+        if type_mark == 'std_logic_vector':
+            subtype = typs.UnresolvedConstrainedStdLogicVector(
+                identifier=None,
+                size=get_constraint_size(constraint),
+                )
+        else:
+            subtype = typs.UnresolvedConstrainedArray(
+                identifier=None,
+                unconstrained_type_identifier=type_mark,
+                size=get_constraint_size(constraint),
+                )
     return subtype
 
 

@@ -1,6 +1,8 @@
+import collections
+
 from vunit import vhdl_parser
 
-from slvcodec import package, typ_parser
+from slvcodec import package, typ_parser, symbolic_math
 
 
 def parsed_entity_from_filename(filename):
@@ -23,7 +25,7 @@ def process_parsed_entity(parsed_entity):
         typ=typ_parser.process_subtype_indication(p.subtype_indication),
         ) for p in p_ports]
     gd = dict([(g.name, g) for g in generics])
-    pd = dict([(p.name, p) for p in ports])
+    pd = collections.OrderedDict([(p.name, p) for p in ports])
     uses = package.get_parsed_package_dependencies(parsed_entity)
     p = UnresolvedEntity(
         identifier=parsed_entity.entities[0].identifier,
@@ -67,7 +69,7 @@ class UnresolvedEntity:
             [u.package for u in resolved_uses.values()])
         available_constants = package.exclusive_dict_merge(
             available_constants, self.generics)
-        resolved_ports = {}
+        resolved_ports = collections.OrderedDict()
         for name, port in self.ports.items():
             if port.typ in available_types:
                 resolved_typ = available_types[port.typ]
@@ -102,6 +104,18 @@ class Entity(object):
 
     def __repr__(self):
         return str(self)
+
+    def inputs_to_slv(self, inputs):
+        slv = ''
+        for port in self.ports.values():
+            if port.direction == 'in':
+                d = inputs.get(port.name, None)
+                if d is None:
+                    o = 'U' * symbolic_math.get_value(port.typ.width)
+                else:
+                    o = port.typ.to_slv(d)
+                slv += o
+        return slv
 
 
 def test_dummy_width():

@@ -3,12 +3,16 @@
 library ieee;
 use ieee.std_logic_1164.all;
 
+library vunit_lib;
+context vunit_lib.vunit_context;
+
 library std;
 use std.textio;
 use work.txt_util.all;
 
 entity ReadFile is
   generic (FILENAME: string;
+           PASSED_RUNNER_CFG: string;
            WIDTH: positive);
   port (clk: in std_logic;
         out_data: out std_logic_vector(0 to WIDTH-1));
@@ -24,6 +28,7 @@ begin
     variable input_string : string(1 to WIDTH); 
     variable counter: natural := 0;
   begin
+    test_runner_setup(runner, PASSED_RUNNER_CFG);
 
     textio.file_open(input_file, FILENAME, read_mode);
 
@@ -42,7 +47,8 @@ begin
       counter := counter + 1;
       wait until rising_edge(clk);
     end loop;  
-    assert false report "end of simulation" severity failure;
+
+    test_runner_cleanup(runner);
   end process;
 
 end arch;

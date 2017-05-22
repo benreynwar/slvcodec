@@ -3,7 +3,7 @@ use ieee.std_logic_1164.all;
 
 package vhdl_type_pkg is
   constant WIDTH: natural := 6;
-  constant SIZE: natural := 0;
+  constant SIZE: natural := 2;
 
   subtype t_data is std_logic_vector(WIDTH-1 downto 0);
   type array_of_data is array(integer range <>) of t_data;
