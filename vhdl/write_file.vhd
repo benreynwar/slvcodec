@@ -24,8 +24,8 @@ begin
     textio.file_open(output_file, FILENAME, write_mode);
 
     while true loop
-      print(output_file, str(in_data)); 
       wait until rising_edge(clk);
+      print(output_file, str(in_data));
     end loop;
 
     textio.file_close(output_file);

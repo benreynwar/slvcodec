@@ -2,7 +2,7 @@ import collections
 
 from vunit import vhdl_parser
 
-from slvcodec import package, typ_parser, symbolic_math
+from slvcodec import package, typ_parser, symbolic_math, typs
 
 
 def parsed_entity_from_filename(filename):
@@ -14,7 +14,7 @@ def parsed_entity_from_filename(filename):
 
 def process_parsed_entity(parsed_entity):
     p_generics = parsed_entity.entities[0].generics
-    generics = [Generic(
+    generics = [typs.Generic(
         name=g.identifier,
         typ=typ_parser.process_subtype_indication(g.subtype_indication),
         ) for g in p_generics]
@@ -34,17 +34,6 @@ def process_parsed_entity(parsed_entity):
         uses=uses,
     )
     return p
-
-
-class Generic:
-
-    def __init__(self, name, typ, default=None):
-        self.name = name
-        self.typ = typ
-        self.default = default
-
-    def str_expression(self):
-        return self.name
 
 
 class Port:
@@ -105,17 +94,33 @@ class Entity(object):
     def __repr__(self):
         return str(self)
 
-    def inputs_to_slv(self, inputs):
+    def inputs_to_slv(self, inputs, generics):
         slv = ''
         for port in self.ports.values():
             if port.direction == 'in':
                 d = inputs.get(port.name, None)
                 if d is None:
-                    o = 'U' * symbolic_math.get_value(port.typ.width)
+                    w = typs.make_substitute_generics_function(generics)(port.typ.width)
+                    o = 'U' * symbolic_math.get_value(w)
                 else:
-                    o = port.typ.to_slv(d)
+                    o = port.typ.to_slv(d, generics)
                 slv += o
         return slv
+
+    def outputs_from_slv(self, slv, generics):
+        pos = 0
+        outputs = {}
+        for port in self.ports.values():
+            if port.direction == 'out':
+                w = typs.make_substitute_generics_function(generics)(port.typ.width)
+                width = symbolic_math.get_value(w)
+                intwidth = int(width)
+                assert(width == intwidth)
+                piece = slv[pos: pos+intwidth]
+                pos += intwidth
+                o = port.typ.from_slv(piece, generics)
+                outputs[port.name] = o
+        return outputs
 
 
 def test_dummy_width():

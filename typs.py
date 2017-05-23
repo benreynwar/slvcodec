@@ -1,6 +1,33 @@
 from slvcodec import symbolic_math
 
 
+class Generic:
+
+    def __init__(self, name, typ, default=None):
+        self.name = name
+        self.typ = typ
+        self.default = default
+
+    def str_expression(self):
+        return self.name
+
+
+def make_substitute_generics_function(d):
+    def substitute(item):
+        if isinstance(item, Generic):
+            o = d.get(item.name, item)
+        else:
+            o = symbolic_math.transform(item, substitute)
+        return o
+    return substitute
+
+
+def apply_generics(generics, expression):
+    substituted = make_substitute_generics_function(generics)(expression)
+    value = symbolic_math.get_value(substituted)
+    return value
+
+
 class UnresolvedConstant:
 
     def __init__(self, name):
@@ -46,7 +73,7 @@ class StdLogic:
     def __str__(self):
         return 'std_logic'
 
-    def to_slv(self, data):
+    def to_slv(self, data, generics):
         assert(data in (0, 1))
         if data:
             slv = '1'
@@ -54,16 +81,16 @@ class StdLogic:
             slv = '0'
         return slv
 
-    def from_slv(self, slv):
+    def from_slv(self, slv, generics):
         mapping = {
             '0': 0,
             '1': 1,
             }
-        data = mapping[slv]
+        data = mapping.get(slv, None)
         return data
 
-    def reduce_slv(self, slv):
-        return self.from_slv(slv[0]), slv[1:]
+    def reduce_slv(self, slv, generics):
+        return self.from_slv(slv[0], generics), slv[1:]
 
 std_logic = StdLogic()
 
@@ -105,14 +132,16 @@ class ConstrainedArray:
             self.unconstrained_type.identifier, symbolic_math.str_expression(self.size))
         return s
 
-    def to_slv(self, data):
-        assert(len(data) == self.size.value())
-        slv = self.unconstrained_type.to_slv(data)
+    def to_slv(self, data, generics):
+        size = apply_generics(generics, self.size)
+        assert(len(data) == size)
+        slv = self.unconstrained_type.to_slv(data, generics)
         return slv
 
-    def from_slv(self, slv):
-        data = self.unconstrained_type.from_slv(slv)
-        assert(len(data) == self.size.value())
+    def from_slv(self, slv, generics):
+        data = self.unconstrained_type.from_slv(slv, generics)
+        size = apply_generics(generics, self.size)
+        assert(len(data) == size)
         return data
 
 
@@ -141,16 +170,19 @@ class Array:
         self.identifier = identifier
         self.subtype = subtype
 
-    def to_slv(self, data):
-        slv = ''.join([self.subtype.to_slv(d) for d in data])
+    def to_slv(self, data, generics):
+        slv = ''.join([self.subtype.to_slv(d, generics) for d in data])
         return slv
 
-    def from_slv(self, slv):
-        w = symbolic_math.get_value(self.subtype.width)
-        n = len(slv)/w
-        assert(n * w == len(slv))
-        slv_pieces = [slv[i*w: (i+1)*w] for i in range(n)]
-        data = [self.subtype.from_slv(piece) for piece in slv_pieces]
+    def from_slv(self, slv, generics):
+        w = apply_generics(generics, self.subtype.width)
+        intw = int(w)
+        assert(intw == w)
+        assert(len(slv) % intw == 0)
+        n = len(slv)//intw
+        assert(n * intw == len(slv))
+        slv_pieces = [slv[i*intw: (i+1)*intw] for i in range(n)]
+        data = [self.subtype.from_slv(piece, generics) for piece in slv_pieces]
         return data
 
 
@@ -188,25 +220,28 @@ class ConstrainedStdLogicVector:
             symbolic_math.str_expression(self.size))
         return s
 
-    def to_slv(self, data):
-        size_value = symbolic_math.get_value(self.size)
+    def to_slv(self, data, generics):
+        size = apply_generics(generics, self.size)
         min_value = 0
-        max_value = pow(2, size_value)-1
+        max_value = pow(2, size)-1
         assert(data >= min_value)
         assert(data <= max_value)
         bits = []
-        for i in range(size_value):
+        for i in range(size):
             bits.append(data % 2)
             data = data >> 1
         assert(data == 0)
-        slv = ''.join([std_logic.to_slv(b) for b in bits])
+        slv = ''.join([std_logic.to_slv(b, generics) for b in bits])
         return slv
 
-    def from_slv(self, slv):
-        bits = [std_logic.from_slv(c) for c in slv]
+    def from_slv(self, slv, generics):
+        bits = [std_logic.from_slv(c, generics) for c in slv]
         data = 0
         for b in bits:
-            data = (data << 1) + b
+            if (b is None) or (data is None):
+                data = None
+            else:
+                data = (data << 1) + b
         return data
 
 
@@ -243,18 +278,20 @@ class ConstrainedSigned(Signed):
         self.max_value = pow(2, size.value()-1)-1
         self.min_value = -pow(2, size.value()-1)
 
-    def to_slv(self, data):
+    def to_slv(self, data, generics):
         assert(data >= self.min_value)
         assert(data <= self.max_value)
+        size = apply_generics(generics, self.size)
         if data < 0:
-            data += pow(2, self.size)
-        slv = ConstrainedUnsigned.to_slv(self, data)
+            data += pow(2, size)
+        slv = ConstrainedUnsigned.to_slv(self, data, generics)
         return slv
 
-    def from_slv(self, slv):
-        data = ConstrainedUnsigned.from_slv(self, slv)
+    def from_slv(self, slv, generics):
+        size = apply_generics(generics, self.size)
+        data = ConstrainedUnsigned.from_slv(self, slv, generics)
         if data > self.max_value:
-            data -= pow(2, self.size.value())
+            data -= pow(2, size)
         assert(data >= self.min_value)
         assert(data <= self.max_value)
         return data
@@ -318,21 +355,21 @@ class Record:
     def __str__(self):
         return self.identifier
 
-    def to_slv(self, data):
+    def to_slv(self, data, generics):
         slvs = [
-            subtype.to_slv(data[name]) for name, subtype in self.names_and_subtypes]
+            subtype.to_slv(data[name], generics) for name, subtype in self.names_and_subtypes]
         slv = ''.join(slvs)
         return slv
 
-    def reduce_slv(self, slv):
+    def reduce_slv(self, slv, generics):
         reduced_slv = slv
         data = {}
         for name, subtype in self.names_and_subtypes:
-            data[name], reduced_slv = subtype.reduce_slv(reduced_slv)
+            data[name], reduced_slv = subtype.reduce_slv(reduced_slv, generics)
         return data, reduced_slv
 
-    def from_slv(self, slv):
-        data, reduced_slv = self.reduce_slv(slv)
+    def from_slv(self, slv, generics):
+        data, reduced_slv = self.reduce_slv(slv, generics)
         assert(reduced_slv == '')
         return data
 
