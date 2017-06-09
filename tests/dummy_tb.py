@@ -15,6 +15,8 @@ class DummyTest:
             'i_dummy': {
                 'manydata': [0, 0],
                 'data': 0,
+                'anint': 0,
+                'anotherint': 0,
                 'logic': 0,
                 'slv': 1,
                 },

@@ -55,12 +55,35 @@ def make_array_declarations_and_definitions(array_type):
     return declarations, definitions
 
 
+def make_integer_declarations_and_definitions(integer_type):
+    if hasattr(integer_type, 'width'):
+        declarations = constrained_declarations_template.format(
+            type=integer_type,
+            width_expression=symbolic_math.str_expression(integer_type.width),
+            )
+        definitions = ''
+    else:
+        declarations = unconstrained_declarations_template.format(
+            type=integer_type
+            )
+        template_fn = os.path.join(os.path.dirname(__file__), 'templates', 'slvcodec_integer_template.vhd')
+        with open(template_fn, 'r') as f:
+            definitions_template = jinja2.Template(f.read())
+        definitions = definitions_template.render(
+            type=integer_type.identifier,
+            subtype=integer_type.subtype,
+            )
+    return declarations, definitions
+
+
 def make_declarations_and_definitions(typ):
     if type(typ) in (typs.Array, typs.ConstrainedArray,
                      typs.ConstrainedStdLogicVector):
         return make_array_declarations_and_definitions(typ)
     elif isinstance(typ, typs.Record):
         return make_record_declarations_and_definitions(typ)
+    elif type(typ) in (typs.ConstrainedInteger,):
+        return make_integer_declarations_and_definitions(typ)
     elif isinstance(typ, typs.Enum):
         return make_record_declarations_and_definitions(typ)
     else:

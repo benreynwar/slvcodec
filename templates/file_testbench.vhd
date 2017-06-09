@@ -6,10 +6,9 @@ use work.slvcodec.all;
 entity {{test_name}} is
   generic (
     {{generic_params}}
-    RUNNER_CFG: string;
     CLOCK_PERIOD: time := 10 ns;
-    DATAINFILENAME: string := "blah.dat";
-    DATAOUTFILENAME: string := "blahout.dat"
+    RUNNER_CFG: string;
+    OUTPUT_PATH: string
   );
 end entity;
  
@@ -28,14 +27,14 @@ begin
   output_slv <= to_slvcodec(output_data);
 
   file_reader: entity work.ReadFile
-    generic map(FILENAME => DATAINFILENAME,
+    generic map(FILENAME => OUTPUT_PATH & "/indata.dat",
                 PASSED_RUNNER_CFG => RUNNER_CFG,
                 WIDTH => t_input_width)
     port map(clk => read_clk,
              out_data => input_slv);
 
   file_writer: entity work.WriteFile
-    generic map(FILENAME => DATAOUTFILENAME,
+    generic map(FILENAME => OUTPUT_PATH & "/outdata.dat",
                 WIDTH => t_output_width)
     port map(clk => write_clk,
              in_data => output_slv);
@@ -62,7 +61,7 @@ begin
     generic map(
       {{dut_generics}}
       )
-    port map(clk => clk,
+    port map({{clk_connections}}
              {{connections}}
              );
  

@@ -4,12 +4,31 @@ from vunit import vhdl_parser
 
 from slvcodec import package, typ_parser, symbolic_math, typs
 
+CLOCK_NAMES = ('clk', 'clock')
+
 
 def parsed_entity_from_filename(filename):
     with open(filename, 'r') as f:
         code = f.read()
-        parsed = vhdl_parser.VHDLParser.parse(code, None)
-        return parsed
+    parsed = vhdl_parser.VHDLParser.parse(code, None)
+    return parsed
+
+
+def process_files(filenames):
+    entities = {}
+    packages = []
+    for filename in filenames:
+        parsed = parsed_entity_from_filename(filename)
+        if parsed.entities:
+            p = process_parsed_entity(parsed)
+            entities[p.identifier] = p
+        if parsed.packages:
+            pkg = package.process_parsed_package(parsed)
+            packages.append(pkg)
+    resolved_packages = package.resolve_packages(packages)
+    resolved_entities = dict([(e.identifier, e.resolve(resolved_packages))
+                             for e in entities.values()])
+    return resolved_entities, resolved_packages
 
 
 def process_parsed_entity(parsed_entity):
@@ -95,36 +114,49 @@ class Entity(object):
         return str(self)
 
     def inputs_to_slv(self, inputs, generics):
-        slv = ''
+        slvs = [] 
         for port in self.ports.values():
-            if port.direction == 'in':
+            if (port.direction == 'in') and (port.name not in CLOCK_NAMES):
                 d = inputs.get(port.name, None)
                 if d is None:
                     w = typs.make_substitute_generics_function(generics)(port.typ.width)
                     o = 'U' * symbolic_math.get_value(w)
                 else:
                     o = port.typ.to_slv(d, generics)
-                slv += o
+                slvs.append(o)
+        slv = ''.join(reversed(slvs))
         return slv
 
-    def outputs_from_slv(self, slv, generics):
+    def ports_from_slv(self, slv, generics, direction):
         pos = 0
         outputs = {}
         for port in self.ports.values():
-            if port.direction == 'out':
+            if (port.direction == direction) and (port.name not in CLOCK_NAMES):
                 w = typs.make_substitute_generics_function(generics)(port.typ.width)
                 width = symbolic_math.get_value(w)
                 intwidth = int(width)
                 assert(width == intwidth)
-                piece = slv[pos: pos+intwidth]
+                if pos == 0:
+                    piece = slv[-intwidth:]
+                else:
+                    piece = slv[-pos-intwidth: -pos]
                 pos += intwidth
                 o = port.typ.from_slv(piece, generics)
                 outputs[port.name] = o
         return outputs
 
+    def outputs_from_slv(self, slv, generics):
+        slv = slv.strip()
+        data = self.ports_from_slv(slv, generics, 'out')
+        return data
+
+    def inputs_from_slv(self, slv, generics):
+        slv = slv.strip()
+        data = self.ports_from_slv(slv, generics, 'in')
+        return data
+
 
 def test_dummy_width():
-
     parsed_entity = parsed_entity_from_filename('tests/dummy.vhd')
     entity = process_parsed_entity(parsed_entity)
     packages = package.process_packages(['tests/vhdl_type_pkg.vhd'])

@@ -33,12 +33,10 @@ begin
     textio.file_open(input_file, FILENAME, read_mode);
 
     while not textio.endfile(input_file) loop
+      wait until rising_edge(clk);
       textio.readline(input_file, input_line);
       textio.read(input_line, input_string);
       the_out_data <= to_std_logic_vector(input_string);
-
-      wait until rising_edge(clk);
-
     end loop;
 
     textio.file_close(input_file);

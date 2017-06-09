@@ -90,7 +90,8 @@ class StdLogic:
         return data
 
     def reduce_slv(self, slv, generics):
-        return self.from_slv(slv[0], generics), slv[1:]
+        return self.from_slv(slv[-1], generics), slv[:-1]
+
 
 std_logic = StdLogic()
 
@@ -99,14 +100,24 @@ class UnresolvedConstrainedArray:
 
     resolved = False
 
-    def __init__(self, identifier, unconstrained_type_identifier, size):
+    def __init__(self, identifier, size, unconstrained_type_identifier=None,
+                 unconstrained_type=None):
         self.identifier = identifier
+        assert((unconstrained_type_identifier is None) or (unconstrained_type is None))
+        assert(not ((unconstrained_type_identifier is None) and (unconstrained_type is None)))
+        self.unconstrained_type = unconstrained_type
         self.unconstrained_type_identifier = unconstrained_type_identifier
+        if unconstrained_type_identifier is not None:
+            self.type_dependencies = [self.unconstrained_type_identifier]
+        else:
+            self.type_dependencies = self.unconstrained_type.type_dependencies
         self.size = size
-        self.type_dependencies = [self.unconstrained_type_identifier]
 
     def resolve(self, types, constants):
-        unconstrained_type = types.get(self.unconstrained_type_identifier)
+        if self.unconstrained_type_identifier is not None:
+            unconstrained_type = types.get(self.unconstrained_type_identifier)
+        else:
+            unconstrained_type = self.unconstrained_type.resolve(types, constants)
         size = resolve_expression(self.size, constants)
         return ConstrainedArray(
             identifier=self.identifier,
@@ -125,7 +136,9 @@ class ConstrainedArray:
         self.unconstrained_type = unconstrained_type
         self.size = size
         self.width = symbolic_math.Multiplication(
-            [self.size, self.unconstrained_type.subtype.width], [])
+            powers=(symbolic_math.Power(number=1, expression=self.size),
+                    symbolic_math.Power(number=1, expression=self.unconstrained_type.subtype.width),
+                    ))
 
     def __str__(self):
         s = '{}({}-1 downto 0)'.format(
@@ -210,18 +223,24 @@ class UnresolvedConstrainedStdLogicVector(StdLogicVector):
 
 class ConstrainedStdLogicVector:
 
+    unconstrained_name = 'std_logic_vector'
+
     def __init__(self, identifier, size):
         self.identifier = identifier
         self.size = size
         self.width = size
 
     def __str__(self):
-        s = 'std_logic_vector({}-1 downto 0)'.format(
-            symbolic_math.str_expression(self.size))
+        if self.identifier is None:
+            s = '{}({}-1 downto 0)'.format(
+                self.unconstrained_name,
+                symbolic_math.str_expression(self.size))
+        else:
+            s = self.identifier
         return s
 
     def to_slv(self, data, generics):
-        size = apply_generics(generics, self.size)
+        size = int(apply_generics(generics, self.size))
         min_value = 0
         max_value = pow(2, size)-1
         assert(data >= min_value)
@@ -231,8 +250,15 @@ class ConstrainedStdLogicVector:
             bits.append(data % 2)
             data = data >> 1
         assert(data == 0)
-        slv = ''.join([std_logic.to_slv(b, generics) for b in bits])
+        slv = ''.join([std_logic.to_slv(b, generics) for b in reversed(bits)])
         return slv
+
+    def reduce_slv(self, slv, generics):
+        width = int(apply_generics(generics, self.width))
+        these_slv = slv[:width]
+        reduced_slv = slv[width:]
+        data = self.from_slv(these_slv, generics)
+        return data, reduced_slv
 
     def from_slv(self, slv, generics):
         bits = [std_logic.from_slv(c, generics) for c in slv]
@@ -245,32 +271,85 @@ class ConstrainedStdLogicVector:
         return data
 
 
+class Integer():
+    '''
+    Just at place holder.
+    Not implemented yet.
+    '''
+
+
 class Unsigned(StdLogicVector):
 
-    resolved = True
+    def __init__(self):
+        Array.__init__(self, identifier='unsigned', subtype=std_logic)
 
-    @classmethod
-    def constrain(cls, size):
-        return ConstrainedUnsigned(size)
+
+class UnresolvedConstrainedUnsigned(UnresolvedConstrainedStdLogicVector):
+
+    def resolve(self, types, constants):
+        size = resolve_expression(self.size, constants)
+        return ConstrainedUnsigned(
+            identifier=self.identifier, size=size)
 
 
 class ConstrainedUnsigned(ConstrainedStdLogicVector):
 
-    resolved = True
+    unconstrained_name = 'unsigned'
+
+
+class UnresolvedConstrainedInteger:
+
+    resolved = False
+    type_dependencies = tuple()
+
+    def __init__(self, identifier, lower, upper):
+        self.identifier = identifier
+        self.lower = lower
+        self.upper = upper
+
+    def resolve(self, types, constants):
+        upper = resolve_expression(self.upper, constants)
+        lower = resolve_expression(self.lower, constants)
+        return ConstrainedInteger(
+            identifier=self.identifier, upper=upper, lower=lower)
+
+
+class ConstrainedInteger:
+
+    unconstrained_name = 'integer'
+
+    def __init__(self, identifier, upper, lower):
+        self.identifier = identifier
+        self.upper = upper
+        self.lower = lower
+        self.width = symbolic_math.Function(
+            name='logceil',
+            argument=symbolic_math.Addition(
+                terms=[symbolic_math.Term(number=1, expression=upper),
+                       symbolic_math.Term(number=1, expression=1),
+                       symbolic_math.Term(number=-1, expression=lower),
+                       ])
+            )
 
 
 class Signed(StdLogicVector):
 
+    def __init__(self):
+        Array.__init__(self, identifier='signed', subtype=std_logic)
+
+
+class UnresolvedConstrainedSigned(UnresolvedConstrainedStdLogicVector):
+
+    def resolve(self, types, constants):
+        size = resolve_expression(self.size, constants)
+        return ConstrainedSigned(
+            identifier=self.identifier, size=size)
+
+
+class ConstrainedSigned(ConstrainedStdLogicVector):
+
     resolved = True
-
-    @classmethod
-    def constrain(cls, size):
-        return ConstrainedSigned(size)
-
-
-class ConstrainedSigned(Signed):
-
-    resolved = True
+    unconstrained_name = 'signed'
 
     def __init__(self, size):
         Signed.__init__(self)
@@ -358,7 +437,8 @@ class Record:
     def to_slv(self, data, generics):
         slvs = [
             subtype.to_slv(data[name], generics) for name, subtype in self.names_and_subtypes]
-        slv = ''.join(slvs)
+        slv = ''.join(reversed(slvs))
+        print(self.names_and_subtypes)
         return slv
 
     def reduce_slv(self, slv, generics):

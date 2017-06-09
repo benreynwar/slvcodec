@@ -1,5 +1,11 @@
-from slvcodec import symbolic_math, typs, typ_parser
+import logging
+
+from slvcodec import symbolic_math, typs, typ_parser, config
 from vunit import vhdl_parser
+
+logger = logging.getLogger(__name__)
+
+standard_packages = ('standard', 'std_logic_1164', 'numeric_std', 'math_real')
 
 
 def parsed_package_from_filename(filename):
@@ -21,13 +27,14 @@ class Use:
 def get_parsed_package_dependencies(parsed):
     uses = {}
     for reference in parsed.references:
-        if reference.design_unit in uses:
-            raise Exception('Two packages with same name.')
-        if reference.name_within != 'all':
-            raise Exception("Can't deal with use statements that don't use 'all'")
-        uses[reference.design_unit] = Use(
-            library=reference.library, design_unit=reference.design_unit,
-            name_within=reference.name_within)
+        if reference.is_package_reference():
+            if reference.design_unit in uses:
+                raise Exception('Two packages with same name.')
+            if reference.name_within != 'all':
+                raise Exception("Can't deal with use statements that don't use 'all'")
+            uses[reference.design_unit] = Use(
+                library=reference.library, design_unit=reference.design_unit,
+                name_within=reference.name_within)
     return uses
 
 
@@ -49,11 +56,19 @@ def process_parsed_package(parsed_package):
 
 
 def process_packages(filenames):
-    standard_packages = ('std_logic_1164', 'numeric_std')
     parsed_packages = [parsed_package_from_filename(fn) for fn in filenames]
     processed_packages = [process_parsed_package(p) for p in parsed_packages]
-    pd = dict([(p.identifier, p) for p in processed_packages])
+    resolved_pd = resolve_packages(processed_packages)
+    return resolved_pd
+
+
+def resolve_packages(packages):
+    pd = dict([(p.identifier, p) for p in packages])
     resolved_pd = {
+        'standard': Package(
+            identifier='standard', constants={}, types={
+                'integer': typs.Integer(),
+                }, uses={}),
         'std_logic_1164': Package(
             identifier='std_logic_1164', constants={}, types={
                 'std_logic_vector': typs.StdLogicVector(),
@@ -61,21 +76,26 @@ def process_packages(filenames):
                 }, uses={}),
         'numeric_std': Package(
             identifier='numeric_std', constants={}, types={
-                'unsigned': typs.Unsigned,
-                'signed': typs.Signed,
+                'unsigned': typs.Unsigned(),
+                'signed': typs.Signed(),
+                }, uses={}),
+        'math_real': Package(
+            identifier='math_real', constants={}, types={
                 }, uses={}),
         }
     resolved_package_names = list(standard_packages)
-    toresolve_package_names = [p.identifier for p in processed_packages]
+    toresolve_package_names = [p.identifier for p in packages]
     while toresolve_package_names:
         any_resolved = False
         for pn in toresolve_package_names:
             dependencies = pd[pn].uses.keys()
+            logger.debug('dependencies are {}'.format(dependencies))
+            logger.debug('resolved are {}'.format(resolved_package_names))
             if not (set(dependencies) - set(resolved_package_names)):
                 resolved = pd[pn].resolve(resolved_pd)
                 any_resolved = True
-            resolved_package_names.append(pn)
-            resolved_pd[pn] = resolved
+                resolved_package_names.append(pn)
+                resolved_pd[pn] = resolved
         toresolve_package_names = [x for x in toresolve_package_names
                                    if x not in resolved_package_names]
         if not any_resolved:
@@ -111,7 +131,7 @@ def resolve_dependencies(available, unresolved, dependencies, resolve_function):
         for unresolved_name in unresolved_names:
             unresolved_item = unresolved[unresolved_name]
             item_dependencies = dependencies[unresolved_name]
-            if not set(item_dependencies) - set(available_names):
+            if not (set(item_dependencies) - set(available_names)):
                 any_resolved = True
                 resolved_item = resolve_function(
                     unresolved_name, unresolved_item, updated_available)
@@ -123,7 +143,7 @@ def resolve_dependencies(available, unresolved, dependencies, resolve_function):
                 available_names.append(unresolved_name)
         unresolved_names = list(set(unresolved_names) - set(available_names))
         if not any_resolved:
-            raise Exception('Failed to resolve types {}'.format(unresolved_names))
+            raise Exception('Failed to resolve {}'.format(unresolved_names))
     return resolved
 
 
@@ -154,7 +174,7 @@ class UnresolvedPackage:
     def resolve(self, packages):
         resolved_uses = resolve_uses(self.uses, packages)
         available_types, available_constants = combine_packages(
-            [u.package for u in resolved_uses.values()])
+            [u.package for u in resolved_uses.values()] + [packages['standard']])
 
         def resolve_constant(name, constant, resolved_constants):
             resolved = symbolic_math.make_substitute_function(
@@ -217,8 +237,9 @@ def test_dummy_width():
     packages = process_packages(['tests/vhdl_type_pkg.vhd'])
     p = packages['vhdl_type_pkg']
     t = p.types['t_dummy']
-    assert(t.width.value() == 11)
+    assert(t.width.value() == 30)
 
 
 if __name__ == '__main__':
+    config.setup_logging(logging.DEBUG)
     test_dummy_width()

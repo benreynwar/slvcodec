@@ -1,7 +1,16 @@
 import tokenize
 import logging
+import math
 from collections import namedtuple
 from io import StringIO
+
+
+def logceil(argument):
+    if argument <= 2:
+        v = 1
+    else:
+        v = int(math.ceil(math.log(argument)/math.log(2)))
+    return v
 
 
 def as_int(v):
@@ -63,7 +72,14 @@ def str_expression(item):
 
 def get_constant_list(item):
     if isinstance(item, str):
-        collected = [item]
+        if '"' in item:
+            # Probably something like "001"
+            collected = []
+        elif item == '\n':
+            # Parsing issue that should be fixed properly
+            collected = []
+        else:
+            collected = [item]
     else:
         collected = collect(item, get_constant_list)
     return collected
@@ -82,6 +98,14 @@ def parse_parentheses(item):
         parsed = item.parse_parentheses()
     else:
         parsed = transform(item, parse_parentheses)
+    return parsed
+
+
+def parse_functions(item):
+    if hasattr(item, 'parse_functions'):
+        parsed = item.parse_functions()
+    else:
+        parsed = transform(item, parse_functions)
     return parsed
 
 
@@ -158,6 +182,28 @@ class Expression(ExpressionBase):
     def str_expression(self):
         return ' '.join([str_expression(item) for item in self.items])
 
+    def parse_functions(self):
+        '''
+        Find strings followed immediately by an expression.
+        Assume that is a function.
+        '''
+        items = [parse_functions(item) for item in self.items]
+        last_item = None
+        new_items = []
+        for item in items:
+            if (isinstance(last_item, str) and last_item[0].isalpha() and
+               isinstance(item, Expression)):
+                function_item = Function(name=last_item, argument=item)
+                new_items.append(function_item)
+                last_item = None
+            else:
+                if last_item is not None:
+                    new_items.append(last_item)
+                last_item = item
+        if last_item is not None:
+            new_items.append(last_item)
+        return Expression(new_items)
+
     def parse_parentheses(self):
         open_braces = 0
         new_expression = []
@@ -216,6 +262,7 @@ class Expression(ExpressionBase):
         numbers = []
         expressions = []
         sign = 1
+        is_unknown = False
         for item in items:
             if item == '+':
                 if sign is None:
@@ -227,103 +274,160 @@ class Expression(ExpressionBase):
                     sign = -1 * sign
             else:
                 if sign is None:
-                    raise Exception('Unknown sign')
+                    logger.warning('Failed to parse {}.  Setting to Unknown'.format(items))
+                    is_unknown is True
+                    break
                 numbers.append(sign)
                 expressions.append(item)
                 sign = None
-        assert(sign is None)
-        terms = [Term(number=number, expression=expression)
-                 for number, expression in zip(numbers, expressions)]
-        o = Addition(terms)
+        if is_unknown:
+            o = Unknown(item)
+        else:
+            assert(sign is None)
+            terms = [Term(number=number, expression=expression)
+                     for number, expression in zip(numbers, expressions)]
+            o = Addition(terms)
         return o
 
 
-MultiplicationBase = namedtuple('MultiplicationBase', ['numerators', 'denominators'])
-class Multiplication(MultiplicationBase):
+UnknownBase = namedtuple('UnknownBase', ['items'])
+class Unknown(object):
 
-    def __new__(cls, numerators, denominators):
-        obj = MultiplicationBase.__new__(
-            cls, frozenset(numerators), frozenset(denominators))
+    def transform(self, f):
+        return self
+
+    def collect(self, f):
+        return []
+
+    def value(self):
+        raise Exception('Cannot get value of Unknown.')
+
+
+FunctionBase = namedtuple('FunctionBase', ['name', 'argument'])
+class Function(FunctionBase):
+
+    def transform(self, f):
+        new_argument = f(self.argument)
+        f = Function(name=self.name, argument=new_argument)
+        return f
+
+    def collect(self, f):
+        collected = f(self.argument)
+        return collected
+
+    def value(self):
+        argument = get_value(self.argument)
+        if self.name in ['logceil', 'clog2', 'slvcodec_logceil']:
+            v = logceil(argument)
+        else:
+            raise Exception('Unknown function {}'.format(self.name))
+        return v
+
+    def str_expression(self):
+        s = 'slvcodec_logceil({})'.format(str_expression(self.argument))
+        return s
+
+
+PowerBase = namedtuple('TermBase', ['number', 'expression'])
+class Power(PowerBase):
+
+    def __new__(cls, number, expression):
+        assert(is_int(number))
+        obj = PowerBase.__new__(
+            cls, number, expression)
         return obj
 
     def transform(self, f):
-        numerators = [f(item) for item in self.numerators]
-        denominators = [f(item) for item in self.denominators]
-        t = Multiplication(numerators, denominators)
+        expression = f(self.expression)
+        t = Power(number=self.number, expression=expression)
+        return t
+
+    def collect(self, f):
+        collected = f(self.expression)
+        return collected
+
+    def value(self):
+        result = pow(get_value(self.expression), self.number)
+        return result
+
+    def str_expression(self):
+        if self.number == 1:
+            s = str_expression(self.expression)
+        elif (self.number == 0) or (self.expression == 1):
+            s = 1
+        else:
+            absnumber = abs(self.number)
+            if self.number > 0:
+                s = '*'.join([str_expression(self.expression)]*absnumber)
+            else:
+                s = '/'.join([1]+[str_expression(self.expression)]*absnumber)
+        return s
+
+
+MultiplicationBase = namedtuple('MultiplicationBase', ['powers'])
+class Multiplication(MultiplicationBase):
+
+    def __new__(cls, powers):
+        obj = MultiplicationBase.__new__(
+            cls, tuple(powers))
+        return obj
+
+    def transform(self, f):
+        powers = [f(item) for item in self.powers]
+        t = Multiplication(powers)
         return t
 
     def collect(self, f):
         collected = []
-        for item in list(self.numerators) + list(self.denominators):
+        for item in self.powers:
             collected += f(item)
         return collected
 
     def value(self):
-        numerator_values = [get_value(item) for item in self.numerators]
-        denominator_values = [get_value(item) for item in self.denominators]
+        power_values = [get_value(item) for item in self.powers]
         result = 1.0
-        for n in numerator_values:
+        for n in power_values:
             result *= n
-        for d in denominator_values:
-            result /= d
         return result
 
     def str_expression(self):
-        numerator = '*'.join([str_expression(item) for item in self.numerators])
-        if self.denominators:
-            denominator = '/'.join([str_expression(item) for item in self.denominators])
-            s = '{}/{}'.format(numerator, denominator)
-        else:
-            s = numerator
+        s = '*'.join([str_expression(item) for item in self.powers])
         return s
 
     def simplify_multiplication(self):
-        numerators = [transform(item, simplify_multiplication)
-                      for item in self.numerators]
-        denominators = [transform(item, simplify_multiplication)
-                        for item in self.denominators]
-        new_numerators = []
-        new_denominators = []
-        for x in numerators:
-            if isinstance(x, Multiplication):
-                new_numerators += x.numerators
-                new_denominators += x.denominators
+        new_powers = {}
+        powers = [transform(item, simplify_multiplication)
+                  for item in self.powers]
+        pure = 1
+        for power in powers:
+            if is_int(power.expression):
+                pure *= power.value()
             else:
-                new_numerators.append(x)
-        for x in denominators:
-            if isinstance(x, Multiplication):
-                new_numerators += x.denominators
-                new_denominators += x.numerators
+                if power.expression not in new_powers:
+                    new_powers[power.expression] = Power(
+                        expression=power.expression, number=0)
+                old_number = new_powers[power.expression].number
+                new_number = old_number + power.number
+                new_power = Power(expression=power.expression, number=new_number)
+                new_powers[power.expression] = new_power
+        relevant_powers = [p for p in new_powers.values() if p.number != 0]
+        if len(relevant_powers) == 0:
+            m = 1
+        elif len(relevant_powers) == 1:
+            if relevant_powers[0].number == 1:
+                m = relevant_powers[0].expression
             else:
-                new_denominators.append(x)
-        in_both = set(new_numerators) & set(new_denominators)
-        numerator_int = 1
-        final_numerators = []
-        for x in set(new_numerators) - in_both:
-            if is_int(x):
-                numerator_int *= int(x)
-            else:
-                final_numerators.append(x)
-        denominator_int = 1
-        final_denominators = []
-        for x in set(new_denominators) - in_both:
-            if is_int(x):
-                denominator_int *= int(x)
-            else:
-                final_denominators.append(x)
-        if (not final_numerators) and (not final_denominators) and (denominator_int == 1):
-            o = numerator_int
+                m = relevant_powers[1]
         else:
-            if (len(final_numerators) == 1) and (denominator_int == 1):
-                o = Term(numerator_int, final_numerators[0])
+            m = Multiplication(relevant_powers)
+        if pure != 1:
+            if m == 1:
+                o = pure
             else:
-                if numerator_int != 1:
-                    final_numerators.append(numerator_int)
-                if denominator_int != 1:
-                    final_denominators.append(denominator_int)
-                o = Multiplication(final_numerators, final_denominators)
+                o = Term(number=pure, expression=m)
+        else:
+            o = m
         return o
-
 
     @staticmethod
     def from_items(items):
@@ -331,18 +435,17 @@ class Multiplication(MultiplicationBase):
         # '*' or '/'
         assert(len(items) % 2 == 1)
         assert(len(items) >= 3)
-        denominators = []
-        numerators = [items.pop(0)]
+        powers = [Power(number=1, expression=items.pop(0))]
         while items:
             op = items.pop(0)
             val = items.pop(0)
             if op == '*':
-                numerators.append(val)
+                powers.append(Power(number=1, expression=val))
             elif op == '/':
-                denominators.append(val)
+                powers.append(Power(number=-1, expression=val))
             else:
                 raise ValueError('Invalid operator {}'.format(op))
-        return Multiplication(numerators, denominators)
+        return Multiplication(powers)
 
 
 TermBase = namedtuple('TermBase', ['number', 'expression'])
@@ -350,7 +453,7 @@ class Term(TermBase):
 
     def __new__(cls, number, expression):
         assert(is_int(number))
-        obj = MultiplicationBase.__new__(
+        obj = TermBase.__new__(
             cls, number, expression)
         return obj
 
@@ -474,7 +577,7 @@ class Addition(AdditionBase):
             if new_numbers[0] == 1:
                 o = new_expressions[0]
             else:
-                o = Term([new_numbers[0], new_expressions[0]])
+                o = Term(number=new_numbers[0], expression=new_expressions[0])
         else:
             ts = [Term(number=n, expression=e) for n, e in zip(new_numbers, new_expressions)]
             if not ts:
@@ -493,7 +596,8 @@ def string_to_expression(s):
 
 def simplify(item):
     parsed_parentheses = parse_parentheses(item)
-    parsed_multiplication = parse_multiplication(parsed_parentheses)
+    parsed_functions = parse_functions(parsed_parentheses)
+    parsed_multiplication = parse_multiplication(parsed_functions)
     simplified = simplify_multiplication(parsed_multiplication)
     parsed_addition = parse_addition(simplified)
     simplified_addition = simplify_addition(parsed_addition)
@@ -511,7 +615,7 @@ def parse_and_simplify(s):
 def test_multiplication():
     string = '3 * 2 / fish / (3 / 4)'
     simplified = parse_and_simplify(string)
-    expected_answer = Multiplication([8], ['fish'])
+    expected_answer = Term(number=8, expression='fish')
     assert(simplified == expected_answer)
 
 
@@ -572,10 +676,12 @@ def test_integer():
     simplified = parse_and_simplify(string)
     assert(simplified == 4)
 
+
 def test_simplication():
     string = '(width + 1) - 1'
     simplified = parse_and_simplify(string)
     assert(simplified == 'width')
+
 
 def test_multiply_simplification():
     string = '2*fish - fish - fish'
@@ -583,13 +689,35 @@ def test_multiply_simplification():
     assert(simplified == 0)
 
 
+def test_function():
+    string = 'logceil(5 + 3) - 2'
+    simplified = parse_and_simplify(string)
+    assert(simplified.value() == 1)
+
+
+def test_function2():
+    string = '(logceil(5*4)-1)+1-0'
+    simplified = parse_and_simplify(string)
+    assert(simplified.value() == 5)
+
+
+def test_multiplication3():
+    string = '7 * 7'
+    simplified = parse_and_simplify(string)
+    print(simplified)
+    assert(simplified == 49)
+
+
 if __name__ == '__main__':
+    test_multiplication3()
+    test_function2()
+    test_function()
     #test_str_expression()
     test_multiply_simplification()
     test_constant_list()
     test_simplication()
     test_integer()
-    test_multiplication()
+    #test_multiplication()
     test_multiplication2()
     test_addition()
     test_addition2()
