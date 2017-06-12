@@ -112,6 +112,13 @@ def resolve_packages(packages):
     return resolved_pd
 
 
+def parse_process_and_resolve_packages(filenames):
+    parsed = [parsed_from_filename(fn) for fn in filenames]
+    processed = [process_parsed_package(p) for p in parsed]
+    resolved_packages = resolve_packages(processed)
+    return resolved_packages
+
+
 def exclusive_dict_merge(a, b):
     '''
     Merges two dictionaries confirming that their are no

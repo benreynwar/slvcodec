@@ -9,11 +9,11 @@ vhdl_dir = os.path.join(os.path.dirname(__file__),  'vhdl')
 def test_dummy_width():
     # Parse and process entity
     entity_filename = os.path.join(vhdl_dir, 'dummy.vhd')
-    parsed_entity = entity.parsed_from_filename(entity_filename)
+    parsed_entity = package.parsed_from_filename(entity_filename)
     processed_entity = entity.process_parsed_entity(parsed_entity)
     # Parse and process packages
     package_filenames = [os.path.join(vhdl_dir, 'vhdl_type_pkg.vhd')]
-    packages = package.process_packages(package_filenames)
+    packages = package.parse_process_and_resolve_packages(package_filenames)
     # Resolve the entity with the constants and types defined in the package.
     resolved_entity = processed_entity.resolve(packages=packages)
     # And get the ports from the resolved entity.
