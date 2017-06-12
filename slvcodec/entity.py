@@ -1,24 +1,12 @@
 import collections
 import logging
 
-from vunit import vhdl_parser
-
-from slvcodec import package, typ_parser, symbolic_math, typs, config
+from slvcodec import package, typ_parser, symbolic_math, typs
 
 
 logger = logging.getLogger(__name__)
 
 CLOCK_NAMES = ('clk', 'clock')
-
-
-def parsed_from_filename(filename):
-    '''
-    Parse the contents of a VHDL file using the VUnit VHDL parser.
-    '''
-    with open(filename, 'r') as f:
-        code = f.read()
-    parsed = vhdl_parser.VHDLParser.parse(code, None)
-    return parsed
 
 
 def process_files(filenames):
@@ -34,7 +22,7 @@ def process_files(filenames):
     entities = {}
     packages = []
     for filename in filenames:
-        parsed = parsed_from_filename(filename)
+        parsed = package.parsed_from_filename(filename)
         if parsed.entities:
             assert(len(parsed.entities) == 1)
             p = process_parsed_entity(parsed)

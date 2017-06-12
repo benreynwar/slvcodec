@@ -1,6 +1,6 @@
 import logging
 
-from slvcodec import symbolic_math, typs, typ_parser, config
+from slvcodec import symbolic_math, typs, typ_parser
 from vunit import vhdl_parser
 
 logger = logging.getLogger(__name__)
@@ -8,7 +8,10 @@ logger = logging.getLogger(__name__)
 standard_packages = ('standard', 'std_logic_1164', 'numeric_std', 'math_real')
 
 
-def parsed_package_from_filename(filename):
+def parsed_from_filename(filename):
+    '''
+    Parse the contents of a VHDL file using the VUnit VHDL parser.
+    '''
     with open(filename, 'r') as f:
         code = f.read()
     parsed = vhdl_parser.VHDLParser.parse(code, None)
@@ -16,6 +19,9 @@ def parsed_package_from_filename(filename):
 
 
 class Use:
+    '''
+    Defines a package dependency for a package or entity.
+    '''
 
     def __init__(self, library, design_unit, name_within, package=None):
         self.library = library
@@ -25,6 +31,9 @@ class Use:
 
 
 def get_parsed_package_dependencies(parsed):
+    '''
+    Process the 'use' clauses in a parsed file to get a list of the package dependencies.
+    '''
     uses = {}
     for reference in parsed.references:
         if reference.is_package_reference():
@@ -39,6 +48,9 @@ def get_parsed_package_dependencies(parsed):
 
 
 def process_parsed_package(parsed_package):
+    '''
+    Process the 'use' clauses in a parsed file to get a list of the package dependencies.
+    '''
     p_constants = parsed_package.packages[0].constants
     p_types = parsed_package.packages[0].types
     constants = dict([(c.identifier, symbolic_math.parse_and_simplify(c.text))
@@ -55,14 +67,12 @@ def process_parsed_package(parsed_package):
     return p
 
 
-def process_packages(filenames):
-    parsed_packages = [parsed_package_from_filename(fn) for fn in filenames]
-    processed_packages = [process_parsed_package(p) for p in parsed_packages]
-    resolved_pd = resolve_packages(processed_packages)
-    return resolved_pd
-
-
 def resolve_packages(packages):
+    '''
+    Takes at list of packages and resolves their references
+    to one another.
+    Returns a dictionary of resolved packages.
+    '''
     pd = dict([(p.identifier, p) for p in packages])
     resolved_pd = {
         'standard': Package(
@@ -103,6 +113,10 @@ def resolve_packages(packages):
 
 
 def exclusive_dict_merge(a, b):
+    '''
+    Merges two dictionaries confirming that their are no
+    keys present in both dictionaries.
+    '''
     assert(not (set(a.keys()) & set(b.keys())))
     c = a.copy()
     c.update(b)
@@ -110,6 +124,10 @@ def exclusive_dict_merge(a, b):
 
 
 def combine_packages(packages):
+    '''
+    Retrieve a dictionary of types and a dictionary of constants from a list of
+    packages.
+    '''
     combined_types = {}
     combined_constants = {}
     for p in packages:
@@ -119,6 +137,19 @@ def combine_packages(packages):
 
 
 def resolve_dependencies(available, unresolved, dependencies, resolve_function):
+    '''
+    Resolves dependencies.
+
+    Args:
+      `available`: a dictionary of already resolved items.
+      `unresolved`: a dictionary of items that have not been resolved.
+      `dependencies`: the items upon which each unresolved item is dependent.
+      `resolve_function`: a function that resolves an item with arguments
+           (unresolved_name, unresolved_item, dictionary_of_resolved_items)
+
+    Returns:
+      `resolved`: a dictionary of resolved item.
+    '''
     updated_available = available.copy()
     unresolved_names = list(unresolved.keys())
     available_names = list(available.keys())
@@ -146,6 +177,11 @@ def resolve_dependencies(available, unresolved, dependencies, resolve_function):
 
 
 def resolve_uses(uses, packages):
+    '''
+    Resolves a list of uses.
+    Returns a list of resolved uses contain a direct
+    reference to the appropriate package.
+    '''
     resolved_uses = {}
     for use_name, use in uses.items():
         if use_name not in packages:
@@ -162,6 +198,11 @@ def resolve_uses(uses, packages):
 
 
 class UnresolvedPackage:
+    '''
+    A package defines all the types, constants and dependencies of that package.
+    The dependencies of the types and constants on other packages have
+    not yet been resolved.
+    '''
 
     def __init__(self, identifier, types, constants, uses):
         self.identifier = identifier
@@ -215,6 +256,11 @@ class UnresolvedPackage:
 
 
 class Package(object):
+    '''
+    A package defines all the types, constants and dependencies of that package.
+    The dependencies of the types and constants on other packages have
+    been resolved.
+    '''
 
     resolved = True
 
