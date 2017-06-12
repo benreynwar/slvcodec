@@ -23,6 +23,7 @@ def uint_to_list_of_uints(uint, size, width):
     Args:
         `uint`: the input unsigned integer
         `width`: The width of each individual unsigned integer.
+        `size`: The number of items in the produced list.
     '''
     residual = uint
     f = pow(2, width)

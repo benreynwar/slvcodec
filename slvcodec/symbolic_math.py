@@ -6,6 +6,10 @@ from io import StringIO
 
 
 def logceil(argument):
+    '''
+    Returns the number of bits necessary to represent an integer that has
+    values in the range from 0 to (argument-1).
+    '''
     if argument <= 2:
         v = 1
     else:
@@ -13,12 +17,15 @@ def logceil(argument):
     return v
 
 
-def as_int(v):
+def as_number(v):
+    '''
+    Converts a value to a number if possible otherwise returns None.
+    '''
     try:
-        if isinstance(v, int):
+        if type(v) in (int, float):
             o = v
         elif isinstance(v, str):
-            o = int(v)
+            o = float(v)
         else:
             o = None
     except ValueError:
@@ -26,23 +33,22 @@ def as_int(v):
     return o
 
 
-def is_int(v):
-    o = as_int(v)
+def is_number(v):
+    '''
+    Whether the value is or can be converted to a number.
+    '''
+    o = as_number(v)
     return (o is not None)
 
 
 logger = logging.getLogger(__name__)
 
 
-def items_to_object(items):
-    if len(items) == 1:
-        o = items[0]
-    else:
-        o = Expression(items)
-    return o
-
-
 def transform(item, f):
+    '''
+    Transform an object with a function.  The object will only be transformed
+    if it has a transform method.
+    '''
     if hasattr(item, 'transform'):
         transformed = item.transform(f)
     else:
@@ -51,6 +57,10 @@ def transform(item, f):
 
 
 def collect(item, f):
+    '''
+    Retrieve items from an object with a function.  Items will only be returned
+    if the object has a collect method.
+    '''
     if hasattr(item, 'collect'):
         collected = item.collect(f)
     else:
@@ -59,10 +69,18 @@ def collect(item, f):
 
 
 def str_expression(item):
+    '''
+    Returns a string representation of the mathematical equation.
+    '''
     if isinstance(item, str):
         o = item
     elif isinstance(item, int):
         o = str(item)
+    elif isinstance(item, float):
+        if int(item) == item:
+            o = str(int(item))
+        else:
+            o = str(item)
     elif hasattr(item, 'str_expression'):
         o = item.str_expression()
     else:
@@ -71,6 +89,12 @@ def str_expression(item):
 
 
 def get_constant_list(item):
+    '''
+    Returns all the variables in the item.
+    >>> item = parse_and_simplify('bear - 3 * fish + bear')
+    >>> get_constant_list(item)
+    {'bear', 'fish'}
+    '''
     if isinstance(item, str):
         if '"' in item:
             # Probably something like "001"
@@ -82,18 +106,24 @@ def get_constant_list(item):
             collected = [item]
     else:
         collected = collect(item, get_constant_list)
-    return collected
+    return set(collected)
 
 
 def parse_integers(item):
-    if is_int(item):
-        parsed = as_int(item)
+    '''
+    Convert all the strings that can be into numbers.
+    '''
+    if is_number(item):
+        parsed = as_number(item)
     else:
         parsed = transform(item, parse_integers)
     return parsed
 
 
 def parse_parentheses(item):
+    '''
+    Group items into expressions based on location of parentheses.
+    '''
     if hasattr(item, 'parse_parentheses'):
         parsed = item.parse_parentheses()
     else:
@@ -117,14 +147,6 @@ def parse_multiplication(item):
     return parsed
 
 
-def simplify_multiplication(item):
-    if hasattr(item, 'simplify_multiplication'):
-        parsed = item.simplify_multiplication()
-    else:
-        parsed = transform(item, simplify_multiplication)
-    return parsed
-
-
 def parse_addition(item):
     if hasattr(item, 'parse_addition'):
         parsed = item.parse_addition()
@@ -133,12 +155,19 @@ def parse_addition(item):
     return parsed
 
 
-def simplify_addition(item):
-    if hasattr(item, 'simplify_addition'):
-        parsed = item.simplify_addition()
-    else:
-        parsed = transform(item, simplify_addition)
-    return parsed
+def simplify(item):
+    old_value = item
+    max_simplifications = 5
+    for index in range(max_simplifications):
+        if hasattr(old_value, 'simplify'):
+            new_value = old_value.simplify()
+        else:
+            new_value = transform(old_value, simplify)
+        if old_value == new_value:
+            break
+        else:
+            old_value = new_value
+    return new_value
 
 
 def make_substitute_function(d):
@@ -152,8 +181,8 @@ def make_substitute_function(d):
 
 
 def get_value(item):
-    if is_int(item):
-        result = as_int(item)
+    if is_number(item):
+        result = as_number(item)
     else:
         result = item.value()
     return result
@@ -161,6 +190,10 @@ def get_value(item):
 
 ExpressionBase = namedtuple('ExpressionBase', ['items'])
 class Expression(ExpressionBase):
+    '''
+    An expression is just a list of tokens and parsed elements.
+    It's an intemediate form used during parsing.
+    '''
 
     def __new__(cls, items):
         obj = ExpressionBase.__new__(cls, tuple(items))
@@ -168,7 +201,11 @@ class Expression(ExpressionBase):
 
     def transform(self, f):
         new_items = [f(item) for item in self.items]
-        return items_to_object(new_items)
+        if len(new_items) == 1:
+            o = new_items[0]
+        else:
+            o = Expression(new_items)
+        return o
 
     def collect(self, f):
         collected = []
@@ -205,6 +242,9 @@ class Expression(ExpressionBase):
         return Expression(new_items)
 
     def parse_parentheses(self):
+        '''
+        Create new sub Expressions for items contained within parentheses.
+        '''
         open_braces = 0
         new_expression = []
         for item in self.items:
@@ -243,6 +283,10 @@ class Expression(ExpressionBase):
         return parsed
 
     def parse_multiplication(self):
+        '''
+        Goes through the expression items and groups terms that are multiplied
+        together into a Multiplication object.
+        '''
         parsed = []
         possible_multiplication = []
         for item in self.items:
@@ -254,10 +298,17 @@ class Expression(ExpressionBase):
             else:
                 possible_multiplication.append(parse_multiplication(item))
         parsed += Expression.finish_multiplication_term(possible_multiplication)
-        wrapped = items_to_object(parsed)
+        if len(parsed) == 1:
+            wrapped = parsed[0]
+        else:
+            wrapped = Expression(parsed)
         return wrapped
 
     def parse_addition(self):
+        '''
+        Goes through the items in the expression and groups together items
+        that are added together into an Addition object.
+        '''
         items = [parse_addition(x) for x in self.items]
         numbers = []
         expressions = []
@@ -274,7 +325,8 @@ class Expression(ExpressionBase):
                     sign = -1 * sign
             else:
                 if sign is None:
-                    logger.warning('Failed to parse {}.  Setting to Unknown'.format(items))
+                    logger.warning('Failed to parse {}.  Setting to Unknown'.format(
+                        items))
                     is_unknown is True
                     break
                 numbers.append(sign)
@@ -292,6 +344,10 @@ class Expression(ExpressionBase):
 
 UnknownBase = namedtuple('UnknownBase', ['items'])
 class Unknown(object):
+    '''
+    A dummy object into which we can throw things we fail to parse without
+    everything crashing and burning.
+    '''
 
     def transform(self, f):
         return self
@@ -305,6 +361,10 @@ class Unknown(object):
 
 FunctionBase = namedtuple('FunctionBase', ['name', 'argument'])
 class Function(FunctionBase):
+    '''
+    Represents a function in the expression.  Currently it 
+    only supports the log ceiling.
+    '''
 
     def transform(self, f):
         new_argument = f(self.argument)
@@ -323,6 +383,14 @@ class Function(FunctionBase):
             raise Exception('Unknown function {}'.format(self.name))
         return v
 
+    def simplify(self):
+        argument = simplify(self.argument)
+        if is_number(argument):
+            o = logceil(argument)
+        else:
+            o = Function(name=self.name, argument=argument)
+        return o
+
     def str_expression(self):
         s = 'slvcodec_logceil({})'.format(str_expression(self.argument))
         return s
@@ -330,9 +398,17 @@ class Function(FunctionBase):
 
 PowerBase = namedtuple('TermBase', ['number', 'expression'])
 class Power(PowerBase):
+    '''
+    A multiplication object contains many Power objects.  This is to make
+    it easy to combine x * y * x into (x ** 2) * y where (x**2) is a power
+    object with number=2, and (y) is a power object with number=1.
+    '''
 
     def __new__(cls, number, expression):
-        assert(is_int(number))
+        '''
+        Represents pow(expression, number)
+        '''
+        assert(is_number(number))
         obj = PowerBase.__new__(
             cls, number, expression)
         return obj
@@ -360,12 +436,15 @@ class Power(PowerBase):
             if self.number > 0:
                 s = '*'.join([str_expression(self.expression)]*absnumber)
             else:
-                s = '/'.join([1]+[str_expression(self.expression)]*absnumber)
+                s = '/'.join(['1']+[str_expression(self.expression)]*absnumber)
         return s
 
 
 MultiplicationBase = namedtuple('MultiplicationBase', ['powers'])
 class Multiplication(MultiplicationBase):
+    '''
+    A group of items which are multiplied/divided together.
+    '''
 
     def __new__(cls, powers):
         obj = MultiplicationBase.__new__(
@@ -394,13 +473,12 @@ class Multiplication(MultiplicationBase):
         s = '*'.join([str_expression(item) for item in self.powers])
         return s
 
-    def simplify_multiplication(self):
+    def simplify(self):
         new_powers = {}
-        powers = [transform(item, simplify_multiplication)
-                  for item in self.powers]
+        powers = [transform(item, simplify) for item in self.powers]
         pure = 1
         for power in powers:
-            if is_int(power.expression):
+            if is_number(power.expression):
                 pure *= power.value()
             else:
                 if power.expression not in new_powers:
@@ -417,14 +495,14 @@ class Multiplication(MultiplicationBase):
             if relevant_powers[0].number == 1:
                 m = relevant_powers[0].expression
             else:
-                m = relevant_powers[1]
+                m = relevant_powers[0]
         else:
             m = Multiplication(relevant_powers)
         if pure != 1:
             if m == 1:
                 o = pure
             else:
-                o = Term(number=pure, expression=m)
+                o = Addition(terms=[Term(number=pure, expression=m)])
         else:
             o = m
         return o
@@ -450,9 +528,14 @@ class Multiplication(MultiplicationBase):
 
 TermBase = namedtuple('TermBase', ['number', 'expression'])
 class Term(TermBase):
+    '''
+    An Addition object contains many Term objects.
+    Useful so that we can easily combine multiples instances of the
+    same constant.
+    '''
 
     def __new__(cls, number, expression):
-        assert(is_int(number))
+        assert(is_number(number))
         obj = TermBase.__new__(
             cls, number, expression)
         return obj
@@ -476,12 +559,16 @@ class Term(TermBase):
         elif self.expression == 1:
             s = self.number
         else:
-            s = '{}*{}'.format(self.number, str_expression(self.expression))
+            s = '{}*{}'.format(str_expression(self.number),
+                               str_expression(self.expression))
         return s
 
 
 AdditionBase = namedtuple('AdditionBase', ['terms'])
 class Addition(AdditionBase):
+    '''
+    Many items that are added/substracted together.
+    '''
 
     def __new__(cls, terms):
         obj = AdditionBase.__new__(cls, tuple(terms))
@@ -504,7 +591,7 @@ class Addition(AdditionBase):
         return result
 
     def str_expression(self):
-        s = '('
+        s = ''
         first = True
         for t in self.terms:
             st = str_expression(t)
@@ -514,7 +601,8 @@ class Addition(AdditionBase):
                 prefix = '+'
             s += prefix + st
             first = False
-        s += ')'
+        if len(self.terms) > 1:
+            s = '(' + s + ')'
         return s
 
     @staticmethod
@@ -542,11 +630,12 @@ class Addition(AdditionBase):
                  number, expression in zip(numbers, expressions)]
         return Addition(terms=terms)
 
-    def simplify_addition(self):
+    def simplify(self):
+        terms = [simplify(term) for term in self.terms]
         # Get a list of terms.
         # If any of the expressions in the terms, are Addition or terms bring them in.
         expanded_terms = []
-        for term in self.terms:
+        for term in terms:
             if isinstance(term.expression, Addition):
                 new_terms = [Term(number=term.number*t.number, expression=t.expression)
                              for t in term.expression.terms]
@@ -562,7 +651,7 @@ class Addition(AdditionBase):
         d = {}
         int_part = 0
         for n, e in numbers_and_expressions:
-            if is_int(e):
+            if is_number(e):
                 int_part += int(e) * n
             else:
                 if e not in d:
@@ -577,9 +666,11 @@ class Addition(AdditionBase):
             if new_numbers[0] == 1:
                 o = new_expressions[0]
             else:
-                o = Term(number=new_numbers[0], expression=new_expressions[0])
+                o = Addition(terms=[Term(
+                    number=new_numbers[0], expression=new_expressions[0])])
         else:
-            ts = [Term(number=n, expression=e) for n, e in zip(new_numbers, new_expressions)]
+            ts = [Term(number=n, expression=e)
+                  for n, e in zip(new_numbers, new_expressions)]
             if not ts:
                 o = 0
             else:
@@ -587,61 +678,36 @@ class Addition(AdditionBase):
         return o
 
 
-def string_to_expression(s):
+def parse_string(s):
+    '''
+    Tokenize a string and then parse it.
+    '''
     expression = Expression(
         [t.string for t in tokenize.generate_tokens(StringIO(s).readline)
          if t.string])
-    return expression
+    item = parse(expression)
+    return item
 
 
-def simplify(item):
-    parsed_parentheses = parse_parentheses(item)
+def parse(item):
+    '''
+    Parsed a tokenized string.
+    '''
+    parsed_integers = parse_integers(item)
+    parsed_parentheses = parse_parentheses(parsed_integers)
     parsed_functions = parse_functions(parsed_parentheses)
     parsed_multiplication = parse_multiplication(parsed_functions)
-    simplified = simplify_multiplication(parsed_multiplication)
-    parsed_addition = parse_addition(simplified)
-    simplified_addition = simplify_addition(parsed_addition)
-    parsed_integers = parse_integers(simplified_addition)
-    final = parsed_integers
-    return final
+    parsed_addition = parse_addition(parsed_multiplication)
+    return parsed_addition
 
 
 def parse_and_simplify(s):
-    expression = string_to_expression(s)
-    simplified = simplify(expression)
+    '''
+    Tokenize, parse and simplify a string.
+    '''
+    parsed = parse_string(s)
+    simplified = simplify(parsed)
     return simplified
-
-
-def test_multiplication():
-    string = '3 * 2 / fish / (3 / 4)'
-    simplified = parse_and_simplify(string)
-    expected_answer = Term(number=8, expression='fish')
-    assert(simplified == expected_answer)
-
-
-def test_multiplication2():
-    string = 'fish / 2 * 3 * (burp/fish)'
-    simplified = parse_and_simplify(string)
-    expected_answer = Multiplication([3, 'burp'], [2])
-    assert(simplified == expected_answer)
-
-
-def test_addition():
-    string = '1 + 2'
-    simplified = parse_and_simplify(string)
-    assert(simplified == 3)
-
-
-def test_addition2():
-    string = '1 + 2 + 4*5'
-    simplified = parse_and_simplify(string)
-    assert(simplified == 23)
-
-
-def test_addition3():
-    string = '1 +(1 + 1)'
-    simplified = parse_and_simplify(string)
-    assert(simplified == 3)
 
 
 def test_substitute():
@@ -656,69 +722,40 @@ def test_substitute():
 
 
 def test_constant_list():
-    string = '3 * (fish + 6) - 2 * bear'
+    string = '3 * (fish + 6) - 2 * bear - fish'
     simplified = parse_and_simplify(string)
     constants = get_constant_list(simplified)
-    assert(set(constants) == set(['fish', 'bear']))
+    assert(constants == set(['fish', 'bear']))
 
-
-def test_str_expression():
-    string = '3 * (fish + 6) - 2 * bear + 2*avo - avo - avo'
-    print(string)
+def test_empty_constant_list():
+    string = '3 * 12'
     simplified = parse_and_simplify(string)
-    print(simplified)
-    s = str_expression(simplified)
-    print(s)
+    constants = get_constant_list(simplified)
+    assert(constants == set())
 
 
-def test_integer():
-    string = '4'
-    simplified = parse_and_simplify(string)
-    assert(simplified == 4)
-
-
-def test_simplication():
-    string = '(width + 1) - 1'
-    simplified = parse_and_simplify(string)
-    assert(simplified == 'width')
-
-
-def test_multiply_simplification():
-    string = '2*fish - fish - fish'
-    simplified = parse_and_simplify(string)
-    assert(simplified == 0)
-
-
-def test_function():
-    string = 'logceil(5 + 3) - 2'
-    simplified = parse_and_simplify(string)
-    assert(simplified.value() == 1)
-
-
-def test_function2():
-    string = '(logceil(5*4)-1)+1-0'
-    simplified = parse_and_simplify(string)
-    assert(simplified.value() == 5)
-
-
-def test_multiplication3():
-    string = '7 * 7'
-    simplified = parse_and_simplify(string)
-    print(simplified)
-    assert(simplified == 49)
-
+def test_simplifications():
+    ins_and_outs = (
+        ('fish + 8*bear + 2 * (fish - bear)',
+         ('(3*fish+6*bear)', '(6*bear+3*fish)')),
+        ('4 + (4 - 4) * 2 - 3', ('1',)),
+        ('7 * 7', ('49',)),
+        ('2 * (3 + 5)', ('16',)),
+        ('logceil(5+3)-2', ('1',)),
+        ('1 + 1', ('2',)),
+        ('(logceil(5*4)-1)+1-0', ('5',)),
+        ('3 * 2 / fish / (3 / 4)', ('8/fish', '8*1/fish')),
+        ('fish + 1 - 1', ('fish',)),
+        ('(fish + 1) - 1', ('fish',)),
+        ('fish + 2 * fish', ('3*fish',)),
+        )
+    for in_string, expected_strings in ins_and_outs:
+        simplified = parse_and_simplify(in_string)
+        out_string = str_expression(simplified)
+        assert(out_string in expected_strings)
 
 if __name__ == '__main__':
-    test_multiplication3()
-    test_function2()
-    test_function()
-    #test_str_expression()
-    test_multiply_simplification()
+    # test_simplifications()
     test_constant_list()
-    test_simplication()
-    test_integer()
-    #test_multiplication()
-    test_multiplication2()
-    test_addition()
-    test_addition2()
-    test_substitute()
+    test_empty_constant_list()
+    # test_substitute()

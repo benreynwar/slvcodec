@@ -151,6 +151,13 @@ class ConstrainedArray:
         slv = self.unconstrained_type.to_slv(data, generics)
         return slv
 
+    def reduce_slv(self, slv, generics):
+        width = int(apply_generics(generics, self.width))
+        these_slv = slv[:width]
+        reduced_slv = slv[width:]
+        data = self.from_slv(these_slv, generics)
+        return data, reduced_slv
+
     def from_slv(self, slv, generics):
         data = self.unconstrained_type.from_slv(slv, generics)
         size = apply_generics(generics, self.size)

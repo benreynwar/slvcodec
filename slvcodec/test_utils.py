@@ -1,8 +1,12 @@
 import os
 import shutil
 import itertools
+import logging
 
 from slvcodec import filetestbench_generator
+
+
+logger = logging.getLogger(__name__)
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 helper_files = os.path.join(dir_path, 'vhdl', '*.vhd')
@@ -89,7 +93,9 @@ class WrapperTest:
         return input_data
 
     def check_output_data(self, input_data, output_data):
-        for indices, test in zip(self.lengths, self.subtests):
+        n_subtests = len(self.subtests)
+        for index, indices, test in zip(range(n_subtests), self.lengths, self.subtests):
+            logger.info('Checking output in subtest {}/{}'.format(index+1, n_subtests))
             start_index, end_index = indices
             sub_input_data = input_data[start_index: end_index]
             sub_output_data = output_data[start_index: end_index]

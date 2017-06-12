@@ -89,8 +89,6 @@ def resolve_packages(packages):
         any_resolved = False
         for pn in toresolve_package_names:
             dependencies = pd[pn].uses.keys()
-            logger.debug('dependencies are {}'.format(dependencies))
-            logger.debug('resolved are {}'.format(resolved_package_names))
             if not (set(dependencies) - set(resolved_package_names)):
                 resolved = pd[pn].resolve(resolved_pd)
                 any_resolved = True
@@ -231,15 +229,3 @@ class Package(object):
 
     def __repr__(self):
         return str(self)
-
-
-def test_dummy_width():
-    packages = process_packages(['tests/vhdl_type_pkg.vhd'])
-    p = packages['vhdl_type_pkg']
-    t = p.types['t_dummy']
-    assert(t.width.value() == 30)
-
-
-if __name__ == '__main__':
-    config.setup_logging(logging.DEBUG)
-    test_dummy_width()

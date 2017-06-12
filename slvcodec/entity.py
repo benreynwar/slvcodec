@@ -1,13 +1,20 @@
 import collections
+import logging
 
 from vunit import vhdl_parser
 
-from slvcodec import package, typ_parser, symbolic_math, typs
+from slvcodec import package, typ_parser, symbolic_math, typs, config
+
+
+logger = logging.getLogger(__name__)
 
 CLOCK_NAMES = ('clk', 'clock')
 
 
-def parsed_entity_from_filename(filename):
+def parsed_from_filename(filename):
+    '''
+    Parse the contents of a VHDL file using the VUnit VHDL parser.
+    '''
     with open(filename, 'r') as f:
         code = f.read()
     parsed = vhdl_parser.VHDLParser.parse(code, None)
@@ -15,13 +22,24 @@ def parsed_entity_from_filename(filename):
 
 
 def process_files(filenames):
+    '''
+    Takes a list of filenames,
+    parses them with the VUnit parser
+    and then processes them in slvcodec classes.
+
+    The packages references to one another are resolved as
+    are the references to types and constants in the entity
+    interfaces.
+    '''
     entities = {}
     packages = []
     for filename in filenames:
-        parsed = parsed_entity_from_filename(filename)
+        parsed = parsed_from_filename(filename)
         if parsed.entities:
+            assert(len(parsed.entities) == 1)
             p = process_parsed_entity(parsed)
             entities[p.identifier] = p
+            assert(not parsed.packages)
         if parsed.packages:
             pkg = package.process_parsed_package(parsed)
             packages.append(pkg)
@@ -32,6 +50,10 @@ def process_files(filenames):
 
 
 def process_parsed_entity(parsed_entity):
+    '''
+    Processes the parse entity (output from VUnit vhdl_parser)
+    into an UnresolvedEntity class.
+    '''
     p_generics = parsed_entity.entities[0].generics
     generics = [typs.Generic(
         name=g.identifier,
@@ -64,6 +86,10 @@ class Port:
 
 
 class UnresolvedEntity:
+    '''
+    Keeps track of the generics, ports and package dependencies of
+    an entity.
+    '''
 
     def __init__(self, identifier, generics, ports, uses):
         self.identifier = identifier
@@ -98,6 +124,9 @@ class UnresolvedEntity:
 
 
 class Entity(object):
+    '''
+    An entity with all types and constants in the ports resolved.
+    '''
 
     resolved = True
 
@@ -154,18 +183,3 @@ class Entity(object):
         slv = slv.strip()
         data = self.ports_from_slv(slv, generics, 'in')
         return data
-
-
-def test_dummy_width():
-    parsed_entity = parsed_entity_from_filename('tests/dummy.vhd')
-    entity = process_parsed_entity(parsed_entity)
-    packages = package.process_packages(['tests/vhdl_type_pkg.vhd'])
-    resolved_entity = entity.resolve(packages=packages)
-    o_data = resolved_entity.ports['o_data']
-    i_dummy = resolved_entity.ports['i_dummy']
-    assert(o_data.typ.width.value() == 24)
-    assert(i_dummy.typ.width.value() == 11)
-
-
-if __name__ == '__main__':
-    test_dummy_width()
