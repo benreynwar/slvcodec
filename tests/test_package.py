@@ -8,7 +8,7 @@ vhdl_dir = os.path.join(os.path.dirname(__file__),  'vhdl')
 
 def test_dummy_width():
     package_filenames = [os.path.join(vhdl_dir, 'vhdl_type_pkg.vhd')]
-    packages = package.process_packages(package_filenames)
+    packages = package.parse_process_and_resolve_packages(package_filenames)
     p = packages['vhdl_type_pkg']
     t = p.types['t_dummy']
     assert(t.width.value() == 23)
