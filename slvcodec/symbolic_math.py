@@ -22,10 +22,19 @@ def as_number(v):
     Converts a value to a number if possible otherwise returns None.
     '''
     try:
-        if type(v) in (int, float):
+        if isinstance(v, int):
             o = v
+        elif isinstance(v, float):
+            if v == int(v):
+                o = int(v)
+            else:
+                o == v
         elif isinstance(v, str):
-            o = float(v)
+            f = float(v)
+            if f == int(f):
+                o = int(f)
+            else:
+                o == f
         else:
             o = None
     except ValueError:
@@ -184,7 +193,7 @@ def get_value(item):
     if is_number(item):
         result = as_number(item)
     else:
-        result = item.value()
+        result = as_number(item.value())
     return result
 
 
