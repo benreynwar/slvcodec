@@ -6,8 +6,12 @@ convert the types back and forth to std_logic_vector.
 
 import os
 import jinja2
+import logging
 
-from slvcodec import typs, package, symbolic_math
+from slvcodec import typs, symbolic_math
+
+logger = logging.getLogger(__name__)
+
 
 declarations_template = '''  constant {type.identifier}_width: natural := {width_expression};
   function to_slvcodec (constant data: {type.identifier}) return std_logic_vector;
@@ -79,8 +83,8 @@ def make_declarations_and_definitions(typ):
     elif isinstance(typ, typs.Record):
         return make_record_declarations_and_definitions(typ)
     else:
-        raise Exception('Unknown typ {}'.format(typ))
-
+        logger.warning('Dont know how to slvcodec functions for {}.'.format(typ))
+        return '', ''
 
 def make_slvcodec_package(pkg):
     '''
@@ -97,7 +101,7 @@ def make_slvcodec_package(pkg):
     combined_declarations = '\n'.join(all_declarations)
     combined_definitions = '\n'.join(all_definitions)
     use_lines = []
-    libraries = []
+    libraries = ['ieee']
     for use in pkg.uses.values():
         use_lines.append('use {}.{}.{};'.format(
             use.library, use.design_unit, use.name_within))

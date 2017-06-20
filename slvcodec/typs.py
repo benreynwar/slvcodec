@@ -1,4 +1,8 @@
+import logging
+
 from slvcodec import symbolic_math
+
+logger = logging.getLogger(__name__)
 
 
 class Generic:
@@ -153,8 +157,8 @@ class ConstrainedArray:
 
     def reduce_slv(self, slv, generics):
         width = int(apply_generics(generics, self.width))
-        these_slv = slv[:width]
-        reduced_slv = slv[width:]
+        these_slv = slv[-width:]
+        reduced_slv = slv[:-width]
         data = self.from_slv(these_slv, generics)
         return data, reduced_slv
 
@@ -262,8 +266,8 @@ class ConstrainedStdLogicVector:
 
     def reduce_slv(self, slv, generics):
         width = int(apply_generics(generics, self.width))
-        these_slv = slv[:width]
-        reduced_slv = slv[width:]
+        these_slv = slv[-width:]
+        reduced_slv = slv[:-width]
         data = self.from_slv(these_slv, generics)
         return data, reduced_slv
 
@@ -445,7 +449,6 @@ class Record:
         slvs = [
             subtype.to_slv(data[name], generics) for name, subtype in self.names_and_subtypes]
         slv = ''.join(reversed(slvs))
-        print(self.names_and_subtypes)
         return slv
 
     def reduce_slv(self, slv, generics):

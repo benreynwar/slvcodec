@@ -15,6 +15,8 @@ def process_parsed_type(typ):
         success = process_array_type(typ)
     elif isinstance(typ, vhdl_parser.VHDLRecordType):
         success = process_record_type(typ)
+    else:
+        raise Exception('Unknown type {}'.format(typ))
     return success
 
 
