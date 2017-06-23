@@ -12,6 +12,8 @@ def test_dummy_width():
     p = packages['vhdl_type_pkg']
     t = p.types['t_dummy']
     assert(t.width.value() == 23)
+    aau = p.types['array_of_array_of_unsigned']
+    assert(aau.width.value() == 6*6*4)
 
 
 if __name__ == '__main__':

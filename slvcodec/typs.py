@@ -173,13 +173,22 @@ class UnresolvedArray:
 
     resolved = False
 
-    def __init__(self, identifier, subtype_identifier):
+    def __init__(self, identifier, subtype_identifier=None, subtype=None):
+        assert((subtype is None) or (subtype_identifier is None))
+        assert((subtype is not None) or (subtype_identifier is not None))
         self.identifier = identifier
         self.subtype_identifier = subtype_identifier
-        self.type_dependencies = [self.subtype_identifier]
+        self.subtype = subtype
+        if self.subtype is not None:
+            self.type_dependencies = self.subtype.type_dependencies
+        else:
+            self.type_dependencies = [self.subtype_identifier]
 
     def resolve(self, types, constants):
-        subtype = types.get(self.subtype_identifier)
+        if self.subtype is not None:
+            subtype = self.subtype.resolve(types, constants)
+        else:
+            subtype = types.get(self.subtype_identifier)
         return Array(
             identifier=self.identifier,
             subtype=subtype,
@@ -232,9 +241,15 @@ class UnresolvedConstrainedStdLogicVector(StdLogicVector):
             identifier=self.identifier, size=size)
 
 
+class UnconstrainedStdLogicVector:
+
+    identifier = 'std_logic_vector'
+
+
 class ConstrainedStdLogicVector:
 
     unconstrained_name = 'std_logic_vector'
+    unconstrained_type = UnconstrainedStdLogicVector
 
     def __init__(self, identifier, size):
         self.identifier = identifier
@@ -282,13 +297,6 @@ class ConstrainedStdLogicVector:
         return data
 
 
-class Integer():
-    '''
-    Just at place holder.
-    Not implemented yet.
-    '''
-
-
 class Unsigned(StdLogicVector):
 
     def __init__(self):
@@ -306,41 +314,6 @@ class UnresolvedConstrainedUnsigned(UnresolvedConstrainedStdLogicVector):
 class ConstrainedUnsigned(ConstrainedStdLogicVector):
 
     unconstrained_name = 'unsigned'
-
-
-class UnresolvedConstrainedInteger:
-
-    resolved = False
-    type_dependencies = tuple()
-
-    def __init__(self, identifier, lower, upper):
-        self.identifier = identifier
-        self.lower = lower
-        self.upper = upper
-
-    def resolve(self, types, constants):
-        upper = resolve_expression(self.upper, constants)
-        lower = resolve_expression(self.lower, constants)
-        return ConstrainedInteger(
-            identifier=self.identifier, upper=upper, lower=lower)
-
-
-class ConstrainedInteger:
-
-    unconstrained_name = 'integer'
-
-    def __init__(self, identifier, upper, lower):
-        self.identifier = identifier
-        self.upper = upper
-        self.lower = lower
-        self.width = symbolic_math.Function(
-            name='logceil',
-            argument=symbolic_math.Addition(
-                terms=[symbolic_math.Term(number=1, expression=upper),
-                       symbolic_math.Term(number=1, expression=1),
-                       symbolic_math.Term(number=-1, expression=lower),
-                       ])
-            )
 
 
 class Signed(StdLogicVector):
@@ -362,11 +335,13 @@ class ConstrainedSigned(ConstrainedStdLogicVector):
     resolved = True
     unconstrained_name = 'signed'
 
-    def __init__(self, size):
-        Signed.__init__(self)
+    def __init__(self, identifier, size):
+        self.identifier = identifier
         self.size = size
-        self.max_value = pow(2, size.value()-1)-1
-        self.min_value = -pow(2, size.value()-1)
+        self.width = size
+        size_value = symbolic_math.get_value(size)
+        self.max_value = pow(2, size_value-1)-1
+        self.min_value = -pow(2, size_value-1)
 
     def to_slv(self, data, generics):
         assert(data >= self.min_value)
@@ -396,7 +371,7 @@ def type_width_constant(typ):
         width = symbolic_math.Multiplication(
             [typ.unconstrained_type.identifier, typ.size], [])
     else:
-        width = '{}_width'.format(typ.identifier)
+        width = '{}_slvcodecwidth'.format(typ.identifier)
     return width
 
 
@@ -470,3 +445,68 @@ class Record:
             lines += ['    {}: {};'.format(name, subtype)]
         lines += ['end record;']
         return '\n'.join(lines)
+
+
+def integer_to_slv(v, width):
+    bits = []
+    for pos in range(width):
+        v = v >> 1
+        bits.append('1' if v % 2 == 1 else '0')
+    slv = ''.join(bits)
+    return slv
+
+
+def slv_to_integer(slv):
+    v = 0
+    for bit in slv:
+        if bit == '1':
+            b = 1
+        elif bit == '0':
+            b = 0
+        else:
+            return None
+        v = (v << 1) + b
+    return v
+
+
+class Enumeration:
+
+    resolved = True
+    type_dependencies = tuple()
+
+    def __init__(self, identifier, literals):
+        self.identifier = identifier
+        self.literals = literals
+        self.width = symbolic_math.logceil(len(literals))
+
+    def __str__(self):
+        return self.identifier
+
+    def to_slv(self, data, generics):
+        if data not in self.literals:
+            raise Exception('Enumeration does not contain {}'.foramt(data))
+        index = self.literals.index(data)
+        slv = integer_to_slv(index, self.width)
+        return slv
+
+    def reduce_slv(self, slv, generics):
+        reduced_slv = slv[:-self.width]
+        index = slv_to_integer(slv[-self.width:])
+        data = self.literals[index]
+        return data, reduced_slv
+
+    def from_slv(self, slv, generics):
+        data, reduced_slv = self.reduce_slv(slv, generics)
+        assert(reduced_slv == '')
+        return data
+
+    def declaration(self):
+        literals = '(' + ', '.join(self.literals) + ')'
+        declaration = 'type {} is {};'.format(self.identifier, literals)
+        return declaration
+
+    def resolve(self, types, constants):
+        '''
+        There is nothing to resolve in an Enumeration.
+        '''
+        return self

@@ -28,7 +28,7 @@ def as_number(v):
             if v == int(v):
                 o = int(v)
             else:
-                o == v
+                o = v
         elif isinstance(v, str):
             f = float(v)
             if f == int(f):
@@ -334,7 +334,7 @@ class Expression(ExpressionBase):
                     sign = -1 * sign
             else:
                 if sign is None:
-                    logger.warning('Failed to parse {}.  Setting to Unknown'.format(
+                    logger.debug('Failed to parse {}.  Setting to Unknown'.format(
                         items))
                     is_unknown is True
                     break
@@ -720,14 +720,16 @@ def parse_and_simplify(s):
 
 
 def test_substitute():
-    string = 'fish + 3 * bear'
+    string = 'fish + 3 * bear * shark / house'
     simplified = parse_and_simplify(string)
     substituted = make_substitute_function({
         'fish': 2,
         'bear': 4,
+        'shark': 3,
+        'house': 2,
         })(simplified)
     final = simplify(substituted)
-    assert(final == 2 + 3 * 4)
+    assert(final == 2 + 3 * 4 * 3 / 2)
 
 
 def test_constant_list():
@@ -764,7 +766,7 @@ def test_simplifications():
         assert(out_string in expected_strings)
 
 if __name__ == '__main__':
-    # test_simplifications()
+    test_simplifications()
     test_constant_list()
     test_empty_constant_list()
-    # test_substitute()
+    test_substitute()

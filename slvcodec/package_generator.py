@@ -13,14 +13,14 @@ from slvcodec import typs, symbolic_math
 logger = logging.getLogger(__name__)
 
 
-declarations_template = '''  constant {type.identifier}_width: natural := {width_expression};
+declarations_template = '''  constant {type.identifier}_slvcodecwidth: natural := {width_expression};
   function to_slvcodec (constant data: {type.identifier}) return std_logic_vector;
   function from_slvcodec (constant slv: std_logic_vector) return {type.identifier};'''
 
-unconstrained_declarations_template = '''  function to_slvcodec (constant data: {type.identifier}) return std_logic_vector;
-  function from_slvcodec (constant slv: std_logic_vector) return {type.identifier};'''
+width_declarations_template = '''  constant {type.identifier}_slvcodecwidth: natural := {width_expression};'''
 
-constrained_declarations_template = '''  constant {type.identifier}_width: natural := {width_expression};'''
+functions_declarations_template = '''  function to_slvcodec (constant data: {type.identifier}) return std_logic_vector;
+  function from_slvcodec (constant slv: std_logic_vector) return {type.identifier};'''
 
 
 def make_record_declarations_and_definitions(record_type):
@@ -47,27 +47,69 @@ def make_record_declarations_and_definitions(record_type):
     return declarations, definitions
 
 
+def make_enumeration_declarations_and_definitions(enumeration_type):
+    '''
+    Create declarations and definitions of functions to convert to and from
+    enumeration types.
+    '''
+    declarations = declarations_template.format(
+        type=enumeration_type,
+        width_expression=symbolic_math.str_expression(enumeration_type.width),
+        )
+    template_fn = os.path.join(os.path.dirname(__file__), 'templates',
+                               'slvcodec_enumeration_template.vhd')
+    with open(template_fn, 'r') as f:
+        definitions_template = jinja2.Template(f.read())
+    definitions = definitions_template.render(
+        type=enumeration_type.identifier,
+        literals=enumeration_type.literals,
+        n_literals=len(enumeration_type.literals),
+        )
+    return declarations, definitions
+
+
 def make_array_declarations_and_definitions(array_type):
     '''
     Create declarations and definitions of functions to convert to and from
     array types.
     '''
     if hasattr(array_type, 'size'):
-        declarations = constrained_declarations_template.format(
+        width_expression = symbolic_math.str_expression(array_type.width)
+        width_declaration = width_declarations_template.format(
             type=array_type,
-            width_expression=symbolic_math.str_expression(array_type.width),
+            width_expression=width_expression,
             )
+        if array_type.unconstrained_type.identifier is None:
+            subtype_width = symbolic_math.str_expression(
+                array_type.unconstrained_type.subtype.width)
+            unconstrained = False
+        else:
+            # We don't need to define functions because it's not a new kind of array
+            # it's just constraining an existing one.
+            subtype_width = None
+    else:
+        width_declaration = ''
+        unconstrained = True
+        if array_type.subtype.identifier is None:
+            subtype_width = symbolic_math.str_expression(array_type.subtype.width)
+        else:
+            subtype_width = array_type.subtype.identifier + '_slvcodecwidth'
+
+    # Define functions unless we have defined size and subtype has identifier
+    if subtype_width is None:
+        # No functions to define.
+        declarations = width_declaration
         definitions = ''
     else:
-        declarations = unconstrained_declarations_template.format(
-            type=array_type
-            )
+        functions_declarations = functions_declarations_template.format(type=array_type)
+        declarations = '\n'.join([width_declaration, functions_declarations])
         template_fn = os.path.join(os.path.dirname(__file__), 'templates', 'slvcodec_array_template.vhd')
         with open(template_fn, 'r') as f:
             definitions_template = jinja2.Template(f.read())
         definitions = definitions_template.render(
             type=array_type.identifier,
-            subtype=array_type.subtype,
+            subtype_width=subtype_width,
+            unconstrained=unconstrained,
             )
     return declarations, definitions
 
@@ -78,13 +120,17 @@ def make_declarations_and_definitions(typ):
     array and record types.  Other types are not yet supported.
     '''
     if type(typ) in (typs.Array, typs.ConstrainedArray,
-                     typs.ConstrainedStdLogicVector):
+                     typs.ConstrainedStdLogicVector, typs.ConstrainedUnsigned,
+                     typs.ConstrainedSigned):
         return make_array_declarations_and_definitions(typ)
     elif isinstance(typ, typs.Record):
         return make_record_declarations_and_definitions(typ)
+    elif isinstance(typ, typs.Enumeration):
+        return make_enumeration_declarations_and_definitions(typ)
     else:
         logger.warning('Dont know how to slvcodec functions for {}.'.format(typ))
         return '', ''
+
 
 def make_slvcodec_package(pkg):
     '''
@@ -105,8 +151,12 @@ def make_slvcodec_package(pkg):
     for use in pkg.uses.values():
         use_lines.append('use {}.{}.{};'.format(
             use.library, use.design_unit, use.name_within))
+        if use.library != 'ieee':
+            use_lines.append('use work.{}_slvcodec.all;'.format(
+                use.design_unit))
         if use.library not in libraries:
             libraries.append(use.library)
+    use_lines.append('use ieee.std_logic_1164.all;'.format(pkg.identifier))
     use_lines.append('use ieee.numeric_std.all;'.format(pkg.identifier))
     use_lines.append('use work.{}.all;'.format(pkg.identifier))
     use_lines.append('use work.slvcodec.all;'.format(pkg.identifier))

@@ -16,8 +16,8 @@ architecture arch of {{test_name}} is
   {{definitions}}
   signal input_data: t_input;
   signal output_data: t_output;
-  signal input_slv: std_logic_vector(t_input_width-1 downto 0);
-  signal output_slv: std_logic_vector(t_output_width-1 downto 0);
+  signal input_slv: std_logic_vector(t_input_slvcodecwidth-1 downto 0);
+  signal output_slv: std_logic_vector(t_output_slvcodecwidth-1 downto 0);
   signal clk: std_logic;
   signal read_clk: std_logic;
   signal write_clk: std_logic;
@@ -29,13 +29,13 @@ begin
   file_reader: entity work.ReadFile
     generic map(FILENAME => OUTPUT_PATH & "/indata.dat",
                 PASSED_RUNNER_CFG => RUNNER_CFG,
-                WIDTH => t_input_width)
+                WIDTH => t_input_slvcodecwidth)
     port map(clk => read_clk,
              out_data => input_slv);
 
   file_writer: entity work.WriteFile
     generic map(FILENAME => OUTPUT_PATH & "/outdata.dat",
-                WIDTH => t_output_width)
+                WIDTH => t_output_slvcodecwidth)
     port map(clk => write_clk,
              in_data => output_slv);
 
@@ -57,10 +57,10 @@ begin
                 )
     port map(clk => write_clk);
 
-  dut: entity work.{{dut_name}}
+  dut: entity work.{{dut_name}}{% if dut_generics %}
     generic map(
       {{dut_generics}}
-      )
+      ){% endif %}
     port map({{clk_connections}}
              {{connections}}
              );
