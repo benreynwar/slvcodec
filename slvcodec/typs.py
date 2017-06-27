@@ -355,10 +355,11 @@ class ConstrainedSigned(ConstrainedStdLogicVector):
     def from_slv(self, slv, generics):
         size = apply_generics(generics, self.size)
         data = ConstrainedUnsigned.from_slv(self, slv, generics)
-        if data > self.max_value:
-            data -= pow(2, size)
-        assert(data >= self.min_value)
-        assert(data <= self.max_value)
+        if data is not None:
+            if data > self.max_value:
+                data -= pow(2, size)
+            assert(data >= self.min_value)
+            assert(data <= self.max_value)
         return data
 
 
@@ -476,16 +477,17 @@ class Enumeration:
 
     def __init__(self, identifier, literals):
         self.identifier = identifier
-        self.literals = literals
+        self.literals = [l.lower() for l in literals]
         self.width = symbolic_math.logceil(len(literals))
 
     def __str__(self):
         return self.identifier
 
     def to_slv(self, data, generics):
-        if data not in self.literals:
-            raise Exception('Enumeration does not contain {}'.foramt(data))
-        index = self.literals.index(data)
+        if data.lower() not in self.literals:
+            raise Exception('Enumeration does not contain {}. Options are {}'.format(
+                data.lower(), self.literals))
+        index = self.literals.index(data.lower())
         slv = integer_to_slv(index, self.width)
         return slv
 
