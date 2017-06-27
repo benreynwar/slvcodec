@@ -388,6 +388,10 @@ class Function(FunctionBase):
         argument = get_value(self.argument)
         if self.name in ['logceil', 'clog2', 'slvcodec_logceil']:
             v = logceil(argument)
+        elif self.name in ('real', 'integer',):
+            v = argument
+        elif self.name in ('ceil',):
+            v = math.ceil(argument)
         else:
             raise Exception('Unknown function {}'.format(self.name))
         return v
@@ -691,9 +695,10 @@ def parse_string(s):
     '''
     Tokenize a string and then parse it.
     '''
-    expression = Expression(
-        [t.string for t in tokenize.generate_tokens(StringIO(s).readline)
-         if t.string])
+    tokens = [
+        t.string for t in tokenize.generate_tokens(StringIO(s).readline)
+        if t.string and (t.string not in ('\n', ))]
+    expression = Expression(tokens)
     item = parse(expression)
     return item
 
