@@ -12,23 +12,28 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 helper_files = os.path.join(dir_path, 'vhdl', '*.vhd')
 
 
-def update_vunit(vu, directory, filenames, top_entity, all_generics, test_class):
-    if os.path.exists(directory):
-        shutil.rmtree(directory)
-    os.makedirs(directory)
+def update_vunit(vu, directory, filenames, top_entity, all_generics, test_class,
+                 top_params):
+    ftb_directory = os.path.join(directory, 'ftb')
+    if os.path.exists(ftb_directory):
+        shutil.rmtree(ftb_directory)
+        logger.debug('update_vunit deleting {}'.format(ftb_directory))
+    os.makedirs(ftb_directory)
     generated_fns, entity = filetestbench_generator.prepare_files(
-       directory=directory, filenames=filenames, top_entity=top_entity)
+       directory=ftb_directory, filenames=filenames, top_entity=top_entity)
+    import random
+    random_lib_name = 'lib' + str(random.randint(0, 1000))
     try:
-        lib = vu.library('lib')
+        lib = vu.library(random_lib_name)
     except KeyError:
-        lib = vu.add_library('lib')
+        lib = vu.add_library(random_lib_name)
     lib.add_source_files(generated_fns)
     lib.add_source_files(helper_files)
     lib.add_source_files(filenames)
 
     tb_generated = lib.entity(top_entity + '_tb')
     for generics in all_generics:
-        test = test_class(entity, generics)
+        test = test_class(entity, generics, top_params)
         tb_generated.add_config(
             name=str(generics),
             generics=generics,

@@ -15,6 +15,10 @@ def process_parsed_type(typ):
         success = process_array_type(typ)
     elif isinstance(typ, vhdl_parser.VHDLRecordType):
         success = process_record_type(typ)
+    elif isinstance(typ, vhdl_parser.VHDLEnumerationType):
+        success = process_enumeration_type(typ)
+    else:
+        raise Exception('Unknown type {}'.format(typ))
     return success
 
 
@@ -132,12 +136,6 @@ def process_subtype(typ):
             identifier=typ.identifier,
             size=size,
         )
-    elif subtype_mark == 'integer':
-        processed = typs.UnresolvedConstrainedInteger(
-            identifier=typ.identifier,
-            upper=upper,
-            lower=lower
-            )
     else:
         processed = typs.UnresolvedConstrainedArray(
             identifier=typ.identifier,
@@ -149,16 +147,28 @@ def process_subtype(typ):
 
 def process_array_type(typ):
     subtype_mark = typ.subtype_indication.type_mark
+    if typ.subtype_indication.constraint:
+        size = get_constraint_size(typ.subtype_indication.constraint)
+        subtype = typs.UnresolvedConstrainedArray(
+            identifier=None,
+            size=size,
+            unconstrained_type_identifier=subtype_mark)
+        subtype_identifier = None
+    else:
+        subtype = None
+        subtype_identifier = subtype_mark
     size = get_size(typ)
     if size is None:
         processed = typs.UnresolvedArray(
             identifier=typ.identifier,
-            subtype_identifier=subtype_mark,
+            subtype_identifier=subtype_identifier,
+            subtype=subtype,
             )
     else:
         unconstrained = typs.UnresolvedArray(
             identifier=None,
-            subtype_identifier=subtype_mark,
+            subtype_identifier=subtype_identifier,
+            subtype=subtype,
             )
         processed = typs.UnresolvedConstrainedArray(
             identifier=typ.identifier,
@@ -200,12 +210,6 @@ def process_subtype_indication(subtype_indication):
                 identifier=None,
                 size=size,
             )
-        elif type_mark == 'integer':
-            subtype = typs.UnresolvedConstrainedInteger(
-                identifier=None,
-                upper=upper_bound,
-                lower=lower_bound
-                )
         else:
             subtype = typs.UnresolvedConstrainedArray(
                 identifier=None,
@@ -225,5 +229,13 @@ def process_record_type(typ):
     processed = typs.UnresolvedRecord(
         typ.identifier,
         names_and_subtypes,
+        )
+    return processed
+
+
+def process_enumeration_type(typ):
+    processed = typs.Enumeration(
+        typ.identifier,
+        typ.literals,
         )
     return processed

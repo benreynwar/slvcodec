@@ -5,7 +5,7 @@ from vunit import vhdl_parser
 
 logger = logging.getLogger(__name__)
 
-standard_packages = ('standard', 'std_logic_1164', 'numeric_std', 'math_real')
+standard_packages = ('std_logic_1164', 'numeric_std', 'math_real')
 
 
 def parsed_from_filename(filename):
@@ -22,7 +22,6 @@ class Use:
     '''
     Defines a package dependency for a package or entity.
     '''
-
     def __init__(self, library, design_unit, name_within, package=None):
         self.library = library
         self.design_unit = design_unit
@@ -75,10 +74,6 @@ def resolve_packages(packages):
     '''
     pd = dict([(p.identifier, p) for p in packages])
     resolved_pd = {
-        'standard': Package(
-            identifier='standard', constants={}, types={
-                'integer': typs.Integer(),
-                }, uses={}),
         'std_logic_1164': Package(
             identifier='std_logic_1164', constants={}, types={
                 'std_logic_vector': typs.StdLogicVector(),
@@ -160,27 +155,50 @@ def resolve_dependencies(available, unresolved, dependencies, resolve_function):
     updated_available = available.copy()
     unresolved_names = list(unresolved.keys())
     available_names = list(available.keys())
-    assert(not set(unresolved_names) & set(available_names))
+    assert(not (set(unresolved_names) & set(available_names)))
     resolved = {}
+    failed = {}
+    failed_names = []
     while unresolved_names:
-        any_resolved = False
+        any_changes = False
         for unresolved_name in unresolved_names:
             unresolved_item = unresolved[unresolved_name]
             item_dependencies = dependencies[unresolved_name]
-            if not (set(item_dependencies) - set(available_names)):
-                any_resolved = True
-                resolved_item = resolve_function(
-                    unresolved_name, unresolved_item, updated_available)
-                assert(unresolved_name not in resolved)
-                resolved[unresolved_name] = resolved_item
-                assert(unresolved_name not in updated_available)
-                updated_available[unresolved_name] = resolved_item
-                assert(unresolved_name not in available_names)
-                available_names.append(unresolved_name)
-        unresolved_names = list(set(unresolved_names) - set(available_names))
-        if not any_resolved:
-            raise Exception('Failed to resolve {}'.format(unresolved_names))
-    return resolved
+            if set(item_dependencies) & set(failed_names):
+                any_changes = True
+                # Cannot resolve this since a dependency has failed.
+                failed[unresolved_name] = unresolved_item
+                failed_names.append(unresolved_name)
+            elif not (set(item_dependencies) - set(available_names)):
+                any_changes = True
+                failed_to_resolve = False
+                try:
+                    resolved_item = resolve_function(
+                        unresolved_name, unresolved_item, updated_available)
+                except Exception as e:
+                    logger.error('Failed to resolve {}.  Error caught when resolving.'.format(unresolved_name))
+                    failed[unresolved_name] = unresolved_item
+                    failed_names.append(unresolved_name)
+                    failed_to_resolve = True
+                if not failed_to_resolve:
+                    assert(unresolved_name not in resolved)
+                    resolved[unresolved_name] = resolved_item
+                    assert(unresolved_name not in updated_available)
+                    updated_available[unresolved_name] = resolved_item
+                    assert(unresolved_name not in available_names)
+                    available_names.append(unresolved_name)
+        if not any_changes:
+            logger.debug('Failed to resolve {}'.format(unresolved_names))
+            for unresolved_name in unresolved_names:
+                unresolved_item = unresolved[unresolved_name]
+                logger.debug('{} was missing the dependencies: {}'.format(
+                    unresolved_name,
+                    set(dependencies[unresolved_name]) - set(available_names)))
+                failed[unresolved_name] = unresolved_item
+                failed_names.append(unresolved_name)
+        unresolved_names = list(set(unresolved_names) - set(available_names) -
+                                set(failed_names))
+    return resolved, failed
 
 
 def resolve_uses(uses, packages):
@@ -220,18 +238,18 @@ class UnresolvedPackage:
     def resolve(self, packages):
         resolved_uses = resolve_uses(self.uses, packages)
         available_types, available_constants = combine_packages(
-            [u.package for u in resolved_uses.values()] + [packages['standard']])
+            [u.package for u in resolved_uses.values()])
 
         def resolve_constant(name, constant, resolved_constants):
             resolved = symbolic_math.make_substitute_function(
-                available_constants)(constant)
+                resolved_constants)(constant)
             resolved_constant = typs.Constant(name=name, expression=resolved)
             return resolved_constant
 
         constant_dependencies = dict([
             (name, symbolic_math.get_constant_list(c))
             for name, c in self.constants.items()])
-        resolved_constants = resolve_dependencies(
+        resolved_constants, failed_constants = resolve_dependencies(
             available=available_constants,
             unresolved=self.constants,
             dependencies=constant_dependencies,
@@ -246,7 +264,7 @@ class UnresolvedPackage:
 
         type_dependencies = dict([
             (name, t.type_dependencies) for name, t in self.types.items()])
-        resolved_types = resolve_dependencies(
+        resolved_types, failed_types = resolve_dependencies(
             available=available_types,
             unresolved=self.types,
             dependencies=type_dependencies,

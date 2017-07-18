@@ -15,7 +15,7 @@ vhdl_dir = os.path.join(os.path.dirname(__file__),  'vhdl')
 
 class DummyChecker:
 
-    def __init__(self, entity, generics):
+    def __init__(self, entity, generics, top_params):
         self.entity = entity
         self.generics = generics
         self.length = generics['length']
@@ -57,7 +57,9 @@ def test_vunit_integration():
                simulator_factory=SimulatorFactory(sim_args),
                )
     entity_filename = os.path.join(vhdl_dir, 'dummy.vhd')
-    package_filenames = [os.path.join(vhdl_dir, 'vhdl_type_pkg.vhd')]
+    package_filenames = [os.path.join(vhdl_dir, 'vhdl_type_pkg.vhd'),
+                         os.path.join(vhdl_dir, 'test_pkg.vhd'),
+                         ]
     filenames = [entity_filename] + package_filenames
     generation_directory = os.path.join(thistestoutput_dir, 'generated')
     os.makedirs(generation_directory)
@@ -67,6 +69,7 @@ def test_vunit_integration():
         filenames=filenames,
         top_entity='dummy',
         all_generics=[{'length': 4}, {'length': 31}],
+        top_params={},
         test_class=DummyChecker,
         )
     all_ok = vu._main()

@@ -28,7 +28,7 @@ def as_number(v):
             if v == int(v):
                 o = int(v)
             else:
-                o == v
+                o = v
         elif isinstance(v, str):
             f = float(v)
             if f == int(f):
@@ -334,7 +334,7 @@ class Expression(ExpressionBase):
                     sign = -1 * sign
             else:
                 if sign is None:
-                    logger.warning('Failed to parse {}.  Setting to Unknown'.format(
+                    logger.debug('Failed to parse {}.  Setting to Unknown'.format(
                         items))
                     is_unknown is True
                     break
@@ -388,6 +388,10 @@ class Function(FunctionBase):
         argument = get_value(self.argument)
         if self.name in ['logceil', 'clog2', 'slvcodec_logceil']:
             v = logceil(argument)
+        elif self.name in ('real', 'integer',):
+            v = argument
+        elif self.name in ('ceil',):
+            v = math.ceil(argument)
         else:
             raise Exception('Unknown function {}'.format(self.name))
         return v
@@ -691,9 +695,10 @@ def parse_string(s):
     '''
     Tokenize a string and then parse it.
     '''
-    expression = Expression(
-        [t.string for t in tokenize.generate_tokens(StringIO(s).readline)
-         if t.string])
+    tokens = [
+        t.string for t in tokenize.generate_tokens(StringIO(s).readline)
+        if t.string and (t.string not in ('\n', ))]
+    expression = Expression(tokens)
     item = parse(expression)
     return item
 
@@ -720,14 +725,16 @@ def parse_and_simplify(s):
 
 
 def test_substitute():
-    string = 'fish + 3 * bear'
+    string = 'fish + 3 * bear * shark / house'
     simplified = parse_and_simplify(string)
     substituted = make_substitute_function({
         'fish': 2,
         'bear': 4,
+        'shark': 3,
+        'house': 2,
         })(simplified)
     final = simplify(substituted)
-    assert(final == 2 + 3 * 4)
+    assert(final == 2 + 3 * 4 * 3 / 2)
 
 
 def test_constant_list():
@@ -764,7 +771,7 @@ def test_simplifications():
         assert(out_string in expected_strings)
 
 if __name__ == '__main__':
-    # test_simplifications()
+    test_simplifications()
     test_constant_list()
     test_empty_constant_list()
-    # test_substitute()
+    test_substitute()

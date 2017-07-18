@@ -1,7 +1,7 @@
 import logging
 import os
 
-from slvcodec import entity, package, typs, config
+from slvcodec import entity, package, typs, config, symbolic_math
 
 vhdl_dir = os.path.join(os.path.dirname(__file__),  'vhdl')
 
@@ -26,6 +26,7 @@ def test_dummy_width():
     w = typs.make_substitute_generics_function({'length': length})(
         o_data.typ.width)
     assert(w.value() == length * 6)
+
 
 if __name__ == '__main__':
     config.setup_logging(logging.DEBUG)
