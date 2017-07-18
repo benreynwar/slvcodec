@@ -16,6 +16,9 @@ setup(
     url = "https://github.com/benreynwar/slvcodec",
     install_requires=[
         'jinja2>=2.8',
-        'vunit==2.0.0',
+        'vunit',
+    ],
+    dependency_links=[
+        'git+git://github.com/benreynwar/vunit.git@#egg=cfebe6340f266d8c263b14bd8531ecbf54180a48',
     ],
 )
