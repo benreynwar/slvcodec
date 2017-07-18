@@ -2,6 +2,7 @@ import os
 import shutil
 import itertools
 import logging
+import vunit
 
 from slvcodec import filetestbench_generator
 
