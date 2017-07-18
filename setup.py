@@ -19,6 +19,6 @@ setup(
         'vunit',
     ],
     dependency_links=[
-        'git+git://github.com/benreynwar/vunit.git@#egg=cfebe6340f266d8c263b14bd8531ecbf54180a48',
+        'git+git://github.com/benreynwar/vunit.git@cfebe6340f266d8c263b14bd8531ecbf54180a48#egg=vunit',
     ],
 )
