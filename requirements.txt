@@ -1,3 +1,0 @@
-jinja2
-git+git://github.com/vunit/vunit@v2.0.0
-

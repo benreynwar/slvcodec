@@ -4,7 +4,7 @@ import shutil
 import logging
 from collections import namedtuple
 
-from vunit.ui import VUnit
+from vunit import VUnit
 from vunit.simulator_factory import SimulatorFactory
 
 from slvcodec import test_utils, config
