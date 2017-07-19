@@ -5,6 +5,6 @@ python:
   - "3.6"
 
 install:
-  - "pip install --with-dependency-links -e ."
+  - "pip install --process-dependency-links -e ."
 
 script: pytest tests
