@@ -7,14 +7,23 @@ logger = logging.getLogger(__name__)
 
 standard_packages = ('std_logic_1164', 'numeric_std', 'math_real')
 
+vparser = vhdl_parser.VHDLParser(None)
+
+def get_types(p):
+    types = (
+        p.enumeration_types +
+        p.record_types +
+        p.array_types +
+        p.subtypes
+        )
+    return types
+
 
 def parsed_from_filename(filename):
     '''
     Parse the contents of a VHDL file using the VUnit VHDL parser.
     '''
-    with open(filename, 'r') as f:
-        code = f.read()
-    parsed = vhdl_parser.VHDLParser.parse(code, None)
+    parsed = vparser.parse(filename)
     return parsed
 
 
@@ -51,11 +60,15 @@ def process_parsed_package(parsed_package):
     Process the 'use' clauses in a parsed file to get a list of the package dependencies.
     '''
     p_constants = parsed_package.packages[0].constants
-    p_types = parsed_package.packages[0].types
+    p_types = get_types(parsed_package.packages[0])
     constants = dict([(c.identifier, symbolic_math.parse_and_simplify(c.text))
                       for c in p_constants])
-    types = dict([(t.identifier, typ_parser.process_parsed_type(t))
-                  for t in p_types])
+    processed_types = [(t.identifier, typ_parser.process_parsed_type(t))
+                  for t in p_types]
+    # Filter out the types that could not be processed.
+    types = dict([(k, v) for k, v in processed_types if v is not None]) 
+    failed_type_keys = [k for k, v in processed_types if v is None]
+    logger.warning('Failed to parse types {}'.format(failed_type_keys))
     uses = get_parsed_package_dependencies(parsed_package)
     p = UnresolvedPackage(
         identifier=parsed_package.packages[0].identifier,

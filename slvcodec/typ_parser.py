@@ -118,30 +118,31 @@ def get_constraint_size(constraint):
 def process_subtype(typ):
     subtype_mark = typ.subtype_indication.type_mark
     size = get_size(typ)
-    lower, upper = get_bounds(typ.integer_range)
-    if (size is None) and ((lower is None) or (upper is None)):
-        raise Exception('Array subtype must be constrained.')
-    if subtype_mark == 'std_logic_vector':
-        processed = typs.UnresolvedConstrainedStdLogicVector(
-            identifier=typ.identifier,
-            size=size,
-        )
-    elif subtype_mark == 'unsigned':
-        processed = typs.UnresolvedConstrainedUnsigned(
-            identifier=typ.identifier,
-            size=size,
-        )
-    elif subtype_mark == 'signed':
-        processed = typs.UnresolvedConstrainedSigned(
-            identifier=typ.identifier,
-            size=size,
-        )
+    if size is None:
+        # Failed to process subtype.
+        processed = None
     else:
-        processed = typs.UnresolvedConstrainedArray(
-            identifier=typ.identifier,
-            unconstrained_type_identifier=subtype_mark,
-            size=size,
+        if subtype_mark == 'std_logic_vector':
+            processed = typs.UnresolvedConstrainedStdLogicVector(
+                identifier=typ.identifier,
+                size=size,
             )
+        elif subtype_mark == 'unsigned':
+            processed = typs.UnresolvedConstrainedUnsigned(
+                identifier=typ.identifier,
+                size=size,
+            )
+        elif subtype_mark == 'signed':
+            processed = typs.UnresolvedConstrainedSigned(
+                identifier=typ.identifier,
+                size=size,
+            )
+        else:
+            processed = typs.UnresolvedConstrainedArray(
+                identifier=typ.identifier,
+                unconstrained_type_identifier=subtype_mark,
+                size=size,
+                )
     return processed
 
 
@@ -180,19 +181,12 @@ def process_array_type(typ):
 
 def process_subtype_indication(subtype_indication):
     constraint = subtype_indication.constraint
-    type_range = subtype_indication.type_range
     type_mark = subtype_indication.type_mark
-    if constraint and type_range:
-        raise Exception('Subtype indication has constraint and a type range.  Cannot handle this.')
     if constraint:
         size = get_constraint_size(constraint)
     else:
         size = None
-    if type_range:
-        lower_bound, upper_bound = get_range_bounds(type_range)
-    else:
-        lower_bound, upper_bound = None, None
-    if (not constraint) and (not type_range):
+    if (not constraint):
         subtype = type_mark
     else:
         if type_mark == 'std_logic_vector':
