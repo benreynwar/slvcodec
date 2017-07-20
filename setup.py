@@ -4,6 +4,7 @@ setup(
     name = "slvcodec",
     packages=['slvcodec',
               ],
+    package_data={'slvcodec': ['templates/*.vhd', 'vhdl/*.vhd']},
     use_scm_version = {
         "relative_to": __file__,
         "write_to": "slvcodec/version.py",
