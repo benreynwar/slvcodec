@@ -68,7 +68,8 @@ def process_parsed_package(parsed_package):
     # Filter out the types that could not be processed.
     types = dict([(k, v) for k, v in processed_types if v is not None]) 
     failed_type_keys = [k for k, v in processed_types if v is None]
-    logger.warning('Failed to parse types {}'.format(failed_type_keys))
+    if failed_type_keys:
+        logger.warning('Failed to parse types {}'.format(failed_type_keys))
     uses = get_parsed_package_dependencies(parsed_package)
     p = UnresolvedPackage(
         identifier=parsed_package.packages[0].identifier,

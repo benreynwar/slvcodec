@@ -392,6 +392,8 @@ class Function(FunctionBase):
             v = argument
         elif self.name in ('ceil',):
             v = math.ceil(argument)
+        elif self.name in ('pow2',):
+            v = pow(2, argument)
         else:
             raise Exception('Unknown function {}'.format(self.name))
         return v

@@ -204,7 +204,7 @@ class Array:
         self.subtype = subtype
 
     def to_slv(self, data, generics):
-        slv = ''.join([self.subtype.to_slv(d, generics) for d in data])
+        slv = ''.join([self.subtype.to_slv(d, generics) for d in reversed(data)])
         return slv
 
     def from_slv(self, slv, generics):
@@ -215,7 +215,7 @@ class Array:
         n = len(slv)//intw
         assert(n * intw == len(slv))
         slv_pieces = [slv[i*intw: (i+1)*intw] for i in range(n)]
-        data = [self.subtype.from_slv(piece, generics) for piece in slv_pieces]
+        data = list(reversed([self.subtype.from_slv(piece, generics) for piece in slv_pieces]))
         return data
 
 

@@ -13,12 +13,17 @@ entity dummy is
     reset: in std_logic;
     i_valid: in std_logic;
     i_dummy: in t_dummy;
-    o_data: out array_of_data(LENGTH-1 downto 0)
+    o_data: out array_of_data(LENGTH-1 downto 0);
+    i_datas: in array_of_data(2 downto 0);
+    o_firstdata: out t_data;
+    o_firstdatabit: out std_logic
     );
 end entity;
 
 architecture arch of dummy is
 begin
   o_data <= (others => (others => '0'));
+  o_firstdata <= i_datas(0);
+  o_firstdatabit <= i_datas(0)(0);
 end architecture;
 

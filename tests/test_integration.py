@@ -4,7 +4,7 @@ import shutil
 import logging
 from collections import namedtuple
 
-from vunit import VUnit
+from vunit import VUnit, VUnitCLI
 from vunit.simulator_factory import SimulatorFactory
 
 from slvcodec import test_utils, config
@@ -32,13 +32,20 @@ class DummyChecker:
                 'logic': 0,
                 'slv': 1,
                 },
+            'i_datas': [0, 1, 2],
             } for i in range(20)]
         return data
 
     def check_output_data(self, input_data, output_data):
         o_data = [d['o_data'] for d in output_data]
         expected_data = [[0]*self.length] * len(o_data)
-        assert(o_data == expected_data)
+        assert o_data == expected_data
+        o_firstdata = [d['o_firstdata'] for d in output_data]
+        expected_firstdata = [d['i_datas'][0] for d in input_data]
+        assert o_firstdata == expected_firstdata
+        o_firstdatabit = [d['o_firstdatabit'] for d in output_data]
+        expected_firstdatabit = [fd % 2 for fd in expected_firstdata]
+        assert o_firstdatabit == expected_firstdatabit
 
 
 SimulatorArgs = namedtuple(
@@ -53,9 +60,8 @@ def test_vunit_integration():
     output_path = os.path.join(thistestoutput_dir, 'integration', 'vunit_out')
     sim_args = SimulatorArgs(
         output_path=output_path, gui=False, gtkwave_fmt=None, gtkwave_args='')
-    vu = VUnit(output_path=output_path,
-               simulator_factory=SimulatorFactory(sim_args),
-               )
+    args = VUnitCLI().parse_args(argv=[])
+    vu = VUnit.from_args(args)
     entity_filename = os.path.join(vhdl_dir, 'dummy.vhd')
     package_filenames = [os.path.join(vhdl_dir, 'vhdl_type_pkg.vhd'),
                          os.path.join(vhdl_dir, 'test_pkg.vhd'),
