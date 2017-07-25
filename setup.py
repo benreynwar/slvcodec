@@ -18,9 +18,9 @@ setup(
     install_requires=[
         'jinja2>=2.8',
         'pytest',
-        'vunit-hdl==2.0.2withextraparsing',
+        'vunit-hdl==2.1.1withextraparsing',
     ],
     dependency_links=[
-        'git+https://github.com/benreynwar/vunit@20d0ce83a5155ef8b4ebd016702a7d7b715ef65e#egg=vunit-hdl-2.0.1withextraparsing',
+        'git+https://github.com/benreynwar/vunit@20d0ce83a5155ef8b4ebd016702a7d7b715ef65e#egg=vunit-hdl-2.1.1withextraparsing',
     ],
 )
