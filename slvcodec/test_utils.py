@@ -36,7 +36,7 @@ def update_vunit(vu, directory, filenames, top_entity, all_generics, test_class,
     for generics in all_generics:
         test = test_class(entity, generics, top_params)
         tb_generated.add_config(
-            name=str(generics),
+            name=str(hash(frozenset([(k, v) for k, v in generics.items()]))),
             generics=generics,
             pre_config=make_pre_config(test, entity, generics),
             post_check=make_post_check(test, entity, generics),
