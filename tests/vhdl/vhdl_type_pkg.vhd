@@ -6,7 +6,8 @@ package vhdl_type_pkg is
   -- Use half width to make sure that one constant can depend on another
   -- in same package.
   constant HALF_WIDTH: natural := 3;
-  constant WIDTH: natural := 2 * HALF_WIDTH;
+  constant WIDTH: natural := 2 *
+                             HALF_WIDTH;
   constant SIZE: natural := 2;
 
   -- Currently slvcodec cannot generate converter functions for integer.

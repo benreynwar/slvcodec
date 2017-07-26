@@ -699,7 +699,7 @@ def parse_string(s):
     '''
     tokens = [
         t.string for t in tokenize.generate_tokens(StringIO(s).readline)
-        if t.string and (t.string not in ('\n', ))]
+        if t.string and (not t.string.isspace())]
     expression = Expression(tokens)
     item = parse(expression)
     return item
