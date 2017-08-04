@@ -1,5 +1,9 @@
 import logging
 
+from vunit import VUnitCLI, VUnit
+
+import fusesoc_generators
+
 
 def setup_logging(level):
     '''
@@ -22,3 +26,14 @@ def setup_logging(level):
         logger.addHandler(ch)
         logger.setLevel(logging.WARNING)
     logger.info('Setup logging at level {}.'.format(level))
+
+
+def setup_vunit(argv=None):
+    args = VUnitCLI().parse_args(argv=argv)
+    log_level = args.log_level
+    vu = VUnit.from_args(args)
+    vu.log_level = getattr(logging, log_level.upper())
+    return vu
+
+def setup_fusesoc(cores_roots):
+    fusesoc_generators.add_cores_roots(cores_roots)

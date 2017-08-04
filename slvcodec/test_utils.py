@@ -2,9 +2,11 @@ import os
 import shutil
 import itertools
 import logging
-from vunit import vhdl_parser
+import random
 
+import fusesoc_generators
 from slvcodec import filetestbench_generator
+from slvcodec import test_utils, params_helper, config
 
 
 logger = logging.getLogger(__name__)
@@ -13,16 +15,15 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 helper_files = os.path.join(dir_path, 'vhdl', '*.vhd')
 
 
-def update_vunit(vu, directory, filenames, top_entity, all_generics, test_class,
-                 top_params):
+def register_test_with_vunit(
+        vu, directory, filenames, top_entity, all_generics, test_class, top_params):
     ftb_directory = os.path.join(directory, 'ftb')
     if os.path.exists(ftb_directory):
         shutil.rmtree(ftb_directory)
         logger.debug('update_vunit deleting {}'.format(ftb_directory))
     os.makedirs(ftb_directory)
     generated_fns, entity = filetestbench_generator.prepare_files(
-       directory=ftb_directory, filenames=filenames, top_entity=top_entity)
-    import random
+        directory=ftb_directory, filenames=filenames, top_entity=top_entity)
     random_lib_name = 'lib' + str(random.randint(0, 1000))
     try:
         lib = vu.library(random_lib_name)
@@ -35,12 +36,61 @@ def update_vunit(vu, directory, filenames, top_entity, all_generics, test_class,
     tb_generated = lib.entity(top_entity + '_tb')
     for generics in all_generics:
         test = test_class(entity, generics, top_params)
+        name = str(generics)
+        if len(name) > 30:
+            name = name[:30]
         tb_generated.add_config(
-            name=str(hash(frozenset([(k, v) for k, v in generics.items()]))),
+            name=name,
             generics=generics,
             pre_config=make_pre_config(test, entity, generics),
             post_check=make_post_check(test, entity, generics),
             )
+
+
+def register_coretest_with_vunit(vu, test, test_output_directory):
+    if 'param_sets' in test:
+        param_sets = test['param_sets']
+    elif 'all_generics' in test:
+        param_sets = [{
+            'generic_sets': test['all_generics'],
+            'top_params': {},
+            }]
+    else:
+        param_sets = [{
+            'generic_sets': [{}],
+            'top_params': {},
+            }]
+    for param_set in param_sets:
+        generic_sets = param_set['generic_sets']
+        top_params = param_set['top_params']
+        h = hash(params_helper.make_hashable(top_params))
+        generation_directory = os.path.join(
+            test_output_directory, test['core_name'], 'generated_{}'.format(h))
+        if os.path.exists(generation_directory):
+            shutil.rmtree(generation_directory)
+            logger.debug('Removing directory {}'.format(generation_directory))
+        os.makedirs(generation_directory)
+        filenames = fusesoc_generators.get_filenames_from_core(
+            generation_directory, test['core_name'], test['entity_name'],
+            generic_sets, top_params)
+        test_utils.register_test_with_vunit(
+            vu=vu,
+            directory=generation_directory,
+            filenames=filenames,
+            top_entity=test['entity_name'],
+            all_generics=generic_sets,
+            test_class=test['generator'],
+            top_params=top_params,
+            )
+
+
+def run_vunit(tests, cores_roots, test_output_directory):
+    vu = config.setup_vunit()
+    config.setup_logging(vu.log_level)
+    config.setup_fusesoc(cores_roots)
+    for test in tests:
+        register_coretest_with_vunit(vu, test, test_output_directory)
+    vu.main()
 
 
 def make_pre_config(test, entity, generics):

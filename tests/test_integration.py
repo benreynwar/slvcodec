@@ -4,13 +4,11 @@ import shutil
 import logging
 from collections import namedtuple
 
-from vunit import VUnit, VUnitCLI
-from vunit.simulator_factory import SimulatorFactory
-
 from slvcodec import test_utils, config
 
 testoutput_dir = os.path.join(os.path.dirname(__file__), '..', 'test_outputs')
-vhdl_dir = os.path.join(os.path.dirname(__file__),  'vhdl')
+coresdir = os.path.join(os.path.dirname(__file__), 'cores')
+vhdl_dir = os.path.join(os.path.dirname(__file__), 'vhdl')
 
 
 class DummyChecker:
@@ -52,24 +50,20 @@ SimulatorArgs = namedtuple(
     'SimulatorArgs', ['output_path', 'gui', 'gtkwave_fmt', 'gtkwave_args'])
 
 
-def test_vunit_integration():
+def test_vunit_simple_integeration():
     thistestoutput_dir = os.path.join(testoutput_dir, 'integration')
     if os.path.exists(thistestoutput_dir):
         shutil.rmtree(thistestoutput_dir)
     os.makedirs(thistestoutput_dir)
-    output_path = os.path.join(thistestoutput_dir, 'integration', 'vunit_out')
-    sim_args = SimulatorArgs(
-        output_path=output_path, gui=False, gtkwave_fmt=None, gtkwave_args='')
-    args = VUnitCLI().parse_args(argv=[])
-    vu = VUnit.from_args(args)
     entity_filename = os.path.join(vhdl_dir, 'dummy.vhd')
     package_filenames = [os.path.join(vhdl_dir, 'vhdl_type_pkg.vhd'),
                          os.path.join(vhdl_dir, 'test_pkg.vhd'),
-                         ]
+                        ]
     filenames = [entity_filename] + package_filenames
     generation_directory = os.path.join(thistestoutput_dir, 'generated')
     os.makedirs(generation_directory)
-    test_utils.update_vunit(
+    vu = config.setup_vunit(argv=[])
+    test_utils.register_test_with_vunit(
         vu=vu,
         directory=generation_directory,
         filenames=filenames,
@@ -79,8 +73,27 @@ def test_vunit_integration():
         test_class=DummyChecker,
         )
     all_ok = vu._main()
-    assert(all_ok)
+    assert all_ok
+
+
+def test_vunit_coretest_integration():
+    thistestoutput_dir = os.path.join(testoutput_dir, 'coretest_integration')
+    if os.path.exists(thistestoutput_dir):
+        shutil.rmtree(thistestoutput_dir)
+    os.makedirs(thistestoutput_dir)
+    coretest = {
+        'core_name': 'Dummy',
+        'entity_name': 'dummy',
+        'all_generics': [{'length': 4}, {'length': 12}],
+        'generator': DummyChecker,
+        }
+    config.setup_fusesoc(cores_roots=[coresdir])
+    vu = config.setup_vunit(argv=[])
+    test_utils.register_coretest_with_vunit(vu, coretest, thistestoutput_dir)
+    all_ok = vu._main()
+    assert all_ok
 
 if __name__ == '__main__':
     config.setup_logging(logging.DEBUG)
-    test_vunit_integration()
+    test_vunit_simple_integration()
+    test_vunit_coretest_integration()
