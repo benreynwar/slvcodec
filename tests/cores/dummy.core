@@ -1,0 +1,11 @@
+CAPI=1
+[main]
+name = Dummy
+description =
+depend =
+
+[fileset rtl]
+files =
+  ../vhdl/vhdl_type_pkg.vhd
+  ../vhdl/dummy.vhd
+file_type = vhdlSource
