@@ -18,9 +18,11 @@ setup(
     install_requires=[
         'jinja2>=2.8',
         'pytest',
+        'fusesoc_generators',
         'vunit-hdl==2.1.1withextraparsing',
     ],
     dependency_links=[
+        'git+https://github.com/benreynwar/fusesoc_generators@823eb17b670feade0d6b28c4be79667fd5c2f380#egg=fusesoc_generators-0.0.0',
         'git+https://github.com/benreynwar/vunit@20d0ce83a5155ef8b4ebd016702a7d7b715ef65e#egg=vunit-hdl-2.1.1withextraparsing',
     ],
 )
