@@ -38,7 +38,8 @@ def register_test_with_vunit(
         test = test_class(entity, generics, top_params)
         name = str(generics)
         if len(name) > 30:
-            name = name[:30]
+            h = hash(params_helper.make_hashable(generics))
+            name = str(h)
         tb_generated.add_config(
             name=name,
             generics=generics,
