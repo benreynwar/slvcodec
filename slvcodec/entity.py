@@ -20,7 +20,6 @@ def process_files(filenames, must_resolve=True):
     interfaces.
     '''
     entities = {}
-    assert must_resolve
     packages = []
     for filename in filenames:
         parsed = package.parsed_from_filename(filename)
