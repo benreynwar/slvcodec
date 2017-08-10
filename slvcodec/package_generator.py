@@ -149,9 +149,9 @@ def make_slvcodec_package(pkg):
     use_lines = []
     libraries = ['ieee']
     for use in pkg.uses.values():
-        use_lines.append('use {}.{}.{};'.format(
-            use.library, use.design_unit, use.name_within))
-        if use.library != 'ieee':
+        if use.library not in  ('ieee', 'std'):
+            use_lines.append('use {}.{}.{};'.format(
+                use.library, use.design_unit, use.name_within))
             use_lines.append('use work.{}_slvcodec.all;'.format(
                 use.design_unit))
         if use.library not in libraries:

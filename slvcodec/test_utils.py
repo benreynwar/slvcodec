@@ -5,6 +5,7 @@ import logging
 import random
 
 import fusesoc_generators
+from slvcodec import add_slvcodec_files
 from slvcodec import filetestbench_generator
 from slvcodec import test_utils, params_helper, config
 
@@ -22,20 +23,21 @@ def register_test_with_vunit(
         shutil.rmtree(ftb_directory)
         logger.debug('update_vunit deleting {}'.format(ftb_directory))
     os.makedirs(ftb_directory)
-    generated_fns, entity = filetestbench_generator.prepare_files(
+    generated_fns, resolved = filetestbench_generator.prepare_files(
         directory=ftb_directory, filenames=filenames, top_entity=top_entity)
+    entity = resolved['entities'][top_entity]
+    combined_filenames = filenames + generated_fns
     random_lib_name = 'lib' + str(random.randint(0, 1000))
     try:
         lib = vu.library(random_lib_name)
     except KeyError:
         lib = vu.add_library(random_lib_name)
-    lib.add_source_files(generated_fns)
-    lib.add_source_files(helper_files)
-    lib.add_source_files(filenames)
+    logger.debug('Adding files to lib {}'.format(combined_filenames))
+    lib.add_source_files(combined_filenames)
 
     tb_generated = lib.entity(top_entity + '_tb')
     for generics in all_generics:
-        test = test_class(entity, generics, top_params)
+        test = test_class(resolved, generics, top_params)
         name = str(generics)
         if len(name) > 30:
             h = hash(params_helper.make_hashable(generics))
@@ -46,6 +48,11 @@ def register_test_with_vunit(
             pre_config=make_pre_config(test, entity, generics),
             post_check=make_post_check(test, entity, generics),
             )
+
+
+def first_pass_file_generator(directory, filenames):
+    new_fns = add_slvcodec_files(directory, filenames)
+    return new_fns
 
 
 def register_coretest_with_vunit(vu, test, test_output_directory):
@@ -73,7 +80,7 @@ def register_coretest_with_vunit(vu, test, test_output_directory):
         os.makedirs(generation_directory)
         filenames = fusesoc_generators.get_filenames_from_core(
             generation_directory, test['core_name'], test['entity_name'],
-            generic_sets, top_params)
+            generic_sets, top_params, first_pass_file_generator)
         test_utils.register_test_with_vunit(
             vu=vu,
             directory=generation_directory,

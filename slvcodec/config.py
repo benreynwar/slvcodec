@@ -1,9 +1,12 @@
 import logging
+import os
 
 from vunit import VUnitCLI, VUnit
 
 import fusesoc_generators
 
+basedir = os.path.abspath(os.path.dirname(__file__))
+vhdldir = os.path.join(basedir, 'vhdl')
 
 def setup_logging(level):
     '''

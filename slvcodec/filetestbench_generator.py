@@ -3,7 +3,7 @@ import os
 
 import jinja2
 
-from slvcodec import entity, package, typs, package_generator
+from slvcodec import entity, package, typs, package_generator, config
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def make_filetestbench(enty):
         for u in enty.uses.values()])
     use_clauses += '\n' + '\n'.join([
         'use {}.{}_slvcodec.{};'.format(u.library, u.design_unit, u.name_within)
-        for u in enty.uses.values() if u.library != 'ieee'])
+        for u in enty.uses.values() if u.library not in ('ieee', 'std') and '_slvcodec' not in u.design_unit])
     generic_params = '\n'.join(['{}: {};'.format(g.name, g.typ)
                                 for g in enty.generics.values()])
     definitions = '\n'.join([
@@ -62,7 +62,11 @@ def make_filetestbench(enty):
 def prepare_files(directory, filenames, top_entity):
     entities, packages = entity.process_files(filenames)
     resolved_entity = entities[top_entity]
-    new_fns = []
+    new_fns = [
+        os.path.join(config.vhdldir, 'read_file.vhd'),
+        os.path.join(config.vhdldir, 'write_file.vhd'),
+        os.path.join(config.vhdldir, 'clock.vhd'),
+    ]
     # Make file testbench
     ftb = make_filetestbench(resolved_entity)
     ftb_fn = os.path.join(directory, '{}_tb.vhd'.format(
@@ -70,16 +74,30 @@ def prepare_files(directory, filenames, top_entity):
     with open(ftb_fn, 'w') as f:
         f.write(ftb)
     new_fns.append(ftb_fn)
-    # Make slvcodec packages
-    for pkg in packages.values():
-        if pkg.identifier not in package.standard_packages:
-            slvcodec_pkg = package_generator.make_slvcodec_package(pkg)
+    resolved = {
+        'entities': entities,
+        'packages': packages,
+        }
+    return new_fns, resolved
+
+
+def add_slvcodec_files(directory, filenames):
+    entities, packages = entity.process_files(filenames, must_resolve=False)
+    combined_filenames = [os.path.join(config.vhdldir, 'txt_util.vhd'),
+                          os.path.join(config.vhdldir, 'slvcodec.vhd')]
+    for fn in filenames:
+        parsed = package.parsed_from_filename(fn)
+        if parsed.packages:
+            package_name = parsed.packages[0].identifier
+            slvcodec_pkg = package_generator.make_slvcodec_package(packages[package_name])
             slvcodec_package_filename = os.path.join(
-                directory, '{}_slvcodec.vhd'.format(pkg.identifier))
+                directory, '{}_slvcodec.vhd'.format(package_name))
             with open(slvcodec_package_filename, 'w') as f:
                 f.write(slvcodec_pkg)
-            new_fns.append(slvcodec_package_filename)
-    return new_fns, resolved_entity
+            combined_filenames += (fn, slvcodec_package_filename)
+        else:
+            combined_filenames.append(fn)
+    return combined_filenames
 
 
 if __name__ == '__main__':

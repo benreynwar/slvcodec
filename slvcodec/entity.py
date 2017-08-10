@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 CLOCK_NAMES = ('clk', 'clock')
 
 
-def process_files(filenames):
+def process_files(filenames, must_resolve=True):
     '''
     Takes a list of filenames,
     parses them with the VUnit parser
@@ -20,6 +20,7 @@ def process_files(filenames):
     interfaces.
     '''
     entities = {}
+    assert must_resolve
     packages = []
     for filename in filenames:
         parsed = package.parsed_from_filename(filename)
@@ -32,7 +33,7 @@ def process_files(filenames):
             pkg = package.process_parsed_package(parsed)
             packages.append(pkg)
     resolved_packages = package.resolve_packages(packages)
-    resolved_entities = dict([(e.identifier, e.resolve(resolved_packages))
+    resolved_entities = dict([(e.identifier, e.resolve(resolved_packages, must_resolve=must_resolve))
                              for e in entities.values()])
     return resolved_entities, resolved_packages
 
@@ -85,8 +86,8 @@ class UnresolvedEntity:
         self.ports = ports
         self.uses = uses
 
-    def resolve(self, packages):
-        resolved_uses = package.resolve_uses(self.uses, packages)
+    def resolve(self, packages, must_resolve=True):
+        resolved_uses = package.resolve_uses(self.uses, packages, must_resolve=must_resolve)
         available_types, available_constants = package.combine_packages(
             [u.package for u in resolved_uses.values()])
         available_constants = package.exclusive_dict_merge(

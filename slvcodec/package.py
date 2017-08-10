@@ -5,7 +5,7 @@ from vunit import vhdl_parser
 
 logger = logging.getLogger(__name__)
 
-standard_packages = ('std_logic_1164', 'numeric_std', 'math_real')
+standard_packages = ('std_logic_1164', 'numeric_std', 'math_real', 'textio')
 
 vparser = vhdl_parser.VHDLParser(None)
 
@@ -59,7 +59,8 @@ def process_parsed_package(parsed_package):
     '''
     Process the 'use' clauses in a parsed file to get a list of the package dependencies.
     '''
-    p_constants = parsed_package.packages[0].constants
+    # FIXME: Horrible hack.  Filtering out data because constant data in function.
+    p_constants = [c for c in parsed_package.packages[0].constants if c.identifier != 'data']
     p_types = get_types(parsed_package.packages[0])
     constants = dict([(c.identifier, symbolic_math.parse_and_simplify(c.text))
                       for c in p_constants])
@@ -100,6 +101,9 @@ def resolve_packages(packages):
                 }, uses={}),
         'math_real': Package(
             identifier='math_real', constants={}, types={
+                }, uses={}),
+        'textio': Package(
+            identifier='textio', constants={}, types={
                 }, uses={}),
         }
     resolved_package_names = list(standard_packages)
@@ -215,7 +219,7 @@ def resolve_dependencies(available, unresolved, dependencies, resolve_function):
     return resolved, failed
 
 
-def resolve_uses(uses, packages):
+def resolve_uses(uses, packages, must_resolve=True):
     '''
     Resolves a list of uses.
     Returns a list of resolved uses contain a direct
@@ -224,15 +228,18 @@ def resolve_uses(uses, packages):
     resolved_uses = {}
     for use_name, use in uses.items():
         if use_name not in packages:
-            raise Exception('Did not find dependency package {}'.format(use_name))
-        if not packages[use_name].resolved:
-            raise Exception('Dependency package {} is not resolved'.format(use_name))
-        resolved_uses[use_name] = Use(
-            library=use.library,
-            design_unit=use.design_unit,
-            name_within=use.name_within,
-            package=packages[use_name],
-            )
+            if must_resolve:
+                raise Exception('Did not find dependency package {}'.format(use_name))
+        elif not packages[use_name].resolved:
+            if must_resolve:
+                raise Exception('Dependency package {} is not resolved'.format(use_name))
+        else:
+            resolved_uses[use_name] = Use(
+                library=use.library,
+                design_unit=use.design_unit,
+                name_within=use.name_within,
+                package=packages[use_name],
+                )
     return resolved_uses
 
 
