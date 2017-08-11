@@ -19,10 +19,10 @@ setup(
         'jinja2>=2.8',
         'pytest',
         'fusesoc_generators',
-        'vunit-hdl==2.1.1withextraparsing',
+        'vunit-hdl==2.1.1withextraparsingb',
     ],
     dependency_links=[
-        'git+https://github.com/benreynwar/fusesoc_generators@823eb17b670feade0d6b28c4be79667fd5c2f380#egg=fusesoc_generators-0.0.0',
-        'git+https://github.com/benreynwar/vunit@20d0ce83a5155ef8b4ebd016702a7d7b715ef65e#egg=vunit-hdl-2.1.1withextraparsing',
+        'git+https://github.com/benreynwar/fusesoc_generators@4a9787319a33f5ac6e97f4ff3cb37c9c5703bdfc#egg=fusesoc_generators-0.0.0',
+        'git+https://github.com/benreynwar/vunit@4d94c37bb9328da89b2bbe8511d714391441d6dc#egg=vunit-hdl-2.1.1withextraparsingb',
     ],
 )
