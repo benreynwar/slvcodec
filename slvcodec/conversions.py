@@ -68,3 +68,25 @@ def slv_to_uint(slv):
                 total += f
             f *= 2
     return total
+
+
+def slv_from_uint(slv):
+    total = 0
+    f = 1
+    for ch in reversed(slv):
+        if ch not in ('0', '1'):
+            total = None
+        if total is not None:
+            if ch == '1':
+                total += f
+            f *= 2
+    return total
+
+
+def uint_to_slv(uint, width):
+    bits = []
+    for w in range(width):
+        bits.append('1' if uint % 2 else '0')
+        uint //= 2
+    slv = ''.join(reversed(bits))
+    return slv

@@ -50,11 +50,6 @@ def register_test_with_vunit(
             )
 
 
-def first_pass_file_generator(directory, filenames):
-    new_fns = add_slvcodec_files(directory, filenames)
-    return new_fns
-
-
 def register_coretest_with_vunit(vu, test, test_output_directory):
     if 'param_sets' in test:
         param_sets = test['param_sets']
@@ -80,7 +75,7 @@ def register_coretest_with_vunit(vu, test, test_output_directory):
         os.makedirs(generation_directory)
         filenames = fusesoc_generators.get_filenames_from_core(
             generation_directory, test['core_name'], test['entity_name'],
-            generic_sets, top_params, first_pass_file_generator)
+            generic_sets, top_params, add_slvcodec_files)
         test_utils.register_test_with_vunit(
             vu=vu,
             directory=generation_directory,

@@ -1,8 +1,12 @@
 import logging
 
-from slvcodec import symbolic_math
+from slvcodec import symbolic_math, conversions
 
 logger = logging.getLogger(__name__)
+
+
+class ResolutionError(Exception):
+    pass
 
 
 class Generic:
@@ -61,7 +65,7 @@ def resolve_expression(e, constants):
     constant_dependencies = symbolic_math.get_constant_list(e)
     missing_constants = set(constant_dependencies) - set(constants.keys())
     if missing_constants:
-        raise Exception('Missing constants {}'.format(missing_constants))
+        raise ResolutionError('Missing constants {}'.format(missing_constants))
     if constant_dependencies:
         resolved_e = symbolic_math.make_substitute_function(constants)(e)
     else:
@@ -237,8 +241,8 @@ class UnresolvedConstrainedStdLogicVector(StdLogicVector):
 
     def resolve(self, types, constants):
         size = resolve_expression(self.size, constants)
-        return ConstrainedStdLogicVector(
-            identifier=self.identifier, size=size)
+        resolved =  ConstrainedStdLogicVector(identifier=self.identifier, size=size)
+        return resolved
 
 
 class UnconstrainedStdLogicVector:
@@ -448,28 +452,6 @@ class Record:
         return '\n'.join(lines)
 
 
-def integer_to_slv(v, width):
-    bits = []
-    for pos in range(width):
-        v = v >> 1
-        bits.append('1' if v % 2 == 1 else '0')
-    slv = ''.join(bits)
-    return slv
-
-
-def slv_to_integer(slv):
-    v = 0
-    for bit in slv:
-        if bit == '1':
-            b = 1
-        elif bit == '0':
-            b = 0
-        else:
-            return None
-        v = (v << 1) + b
-    return v
-
-
 class Enumeration:
 
     resolved = True
@@ -488,12 +470,12 @@ class Enumeration:
             raise Exception('Enumeration does not contain {}. Options are {}'.format(
                 data.lower(), self.literals))
         index = self.literals.index(data.lower())
-        slv = integer_to_slv(index, self.width)
+        slv = conversions.uint_to_slv(index, self.width)
         return slv
 
     def reduce_slv(self, slv, generics):
         reduced_slv = slv[:-self.width]
-        index = slv_to_integer(slv[-self.width:])
+        index = conversions.slv_to_uint(slv[-self.width:])
         data = self.literals[index]
         return data, reduced_slv
 

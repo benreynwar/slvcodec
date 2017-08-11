@@ -59,8 +59,7 @@ def process_parsed_package(parsed_package):
     '''
     Process the 'use' clauses in a parsed file to get a list of the package dependencies.
     '''
-    # FIXME: Horrible hack.  Filtering out data because constant data in function.
-    p_constants = [c for c in parsed_package.packages[0].constants if c.identifier != 'data']
+    p_constants = parsed_package.packages[0].constants
     p_types = get_types(parsed_package.packages[0])
     constants = dict([(c.identifier, symbolic_math.parse_and_simplify(c.text))
                       for c in p_constants])

@@ -2,6 +2,7 @@ import collections
 import logging
 
 from slvcodec import package, typ_parser, symbolic_math, typs
+from slvcodec.typs import ResolutionError
 
 
 logger = logging.getLogger(__name__)
@@ -93,15 +94,21 @@ class UnresolvedEntity:
             available_constants, self.generics)
         resolved_ports = collections.OrderedDict()
         for name, port in self.ports.items():
-            if port.typ in available_types:
-                resolved_typ = available_types[port.typ]
-            elif isinstance(port.typ, str):
-                raise Exception('Cannot resolve port typ {}'.format(port.typ))
-            else:
-                resolved_typ = port.typ.resolve(available_types, available_constants)
-            resolved_port = Port(name=port.name, direction=port.direction,
-                                 typ=resolved_typ)
-            resolved_ports[name] = resolved_port
+            try:
+                if port.typ in available_types:
+                    resolved_typ = available_types[port.typ]
+                elif isinstance(port.typ, str):
+                    raise Exception('Cannot resolve port typ {}'.format(port.typ))
+                else:
+                    resolved_typ = port.typ.resolve(available_types, available_constants)
+                resolved_port = Port(name=port.name, direction=port.direction,
+                                    typ=resolved_typ)
+                resolved_ports[name] = resolved_port
+            except ResolutionError as e:
+                # If we can't resolve and `must_resolve` isn't True then we just
+                # skip ports that we can't resolve.
+                if must_resolve:
+                    raise e
         e = Entity(
             identifier=self.identifier,
             generics=self.generics,
