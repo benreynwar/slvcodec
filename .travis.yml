@@ -22,7 +22,9 @@ before_script:
   - make
   - make install
   - cd ../../
-  - export PATH=$PATH:install-ghdl-llvm/bin/
+  - pwd
+  - echo `pwd`
+  - export PATH=$PATH:`pwd`/install-ghdl-llvm/bin/
                                                                           
 
 script: pytest tests
