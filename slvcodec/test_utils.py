@@ -7,7 +7,7 @@ import random
 import fusesoc_generators
 from slvcodec import add_slvcodec_files
 from slvcodec import filetestbench_generator
-from slvcodec import test_utils, params_helper, config
+from slvcodec import params_helper, config
 
 
 logger = logging.getLogger(__name__)
@@ -16,26 +16,18 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 helper_files = os.path.join(dir_path, 'vhdl', '*.vhd')
 
 
-def register_test_with_vunit(
-        vu, directory, filenames, top_entity, all_generics, test_class, top_params):
-    ftb_directory = os.path.join(directory, 'ftb')
-    if os.path.exists(ftb_directory):
-        shutil.rmtree(ftb_directory)
-        logger.debug('update_vunit deleting {}'.format(ftb_directory))
-    os.makedirs(ftb_directory)
-    generated_fns, resolved = filetestbench_generator.prepare_files(
-        directory=ftb_directory, filenames=filenames, top_entity=top_entity)
-    entity = resolved['entities'][top_entity]
-    combined_filenames = filenames + generated_fns
+def register_rawtest_with_vunit(
+        vu, resolved, filenames, top_entity, all_generics, test_class,
+        top_params):
     random_lib_name = 'lib' + str(random.randint(0, 1000))
     try:
         lib = vu.library(random_lib_name)
     except KeyError:
         lib = vu.add_library(random_lib_name)
-    logger.debug('Adding files to lib {}'.format(combined_filenames))
-    lib.add_source_files(combined_filenames)
-
+    logger.debug('Adding files to lib {}'.format(filenames))
+    lib.add_source_files(filenames)
     tb_generated = lib.entity(top_entity + '_tb')
+    entity = resolved['entities'][top_entity]
     for generics in all_generics:
         test = test_class(resolved, generics, top_params)
         name = str(generics)
@@ -47,7 +39,31 @@ def register_test_with_vunit(
             generics=generics,
             pre_config=make_pre_config(test, entity, generics),
             post_check=make_post_check(test, entity, generics),
-            )
+        )
+
+
+def register_test_with_vunit(
+        vu, directory, filenames, top_entity, all_generics, test_class,
+        top_params):
+    ftb_directory = os.path.join(directory, 'ftb')
+    if os.path.exists(ftb_directory):
+        shutil.rmtree(ftb_directory)
+    os.makedirs(ftb_directory)
+    logger.debug('update_vunit deleting {}'.format(ftb_directory))
+    with_slvcodec_files = add_slvcodec_files(directory, filenames)
+    generated_fns, resolved = filetestbench_generator.prepare_files(
+        directory=ftb_directory, filenames=with_slvcodec_files,
+        top_entity=top_entity)
+    combined_filenames = with_slvcodec_files + generated_fns
+    register_rawtest_with_vunit(
+        vu=vu,
+        resolved=resolved,
+        filenames=combined_filenames,
+        top_entity=top_entity,
+        all_generics=all_generics,
+        test_class=test_class,
+        top_params=top_params,
+    )
 
 
 def register_coretest_with_vunit(vu, test, test_output_directory):
@@ -57,12 +73,12 @@ def register_coretest_with_vunit(vu, test, test_output_directory):
         param_sets = [{
             'generic_sets': test['all_generics'],
             'top_params': {},
-            }]
+        }]
     else:
         param_sets = [{
             'generic_sets': [{}],
             'top_params': {},
-            }]
+        }]
     for param_set in param_sets:
         generic_sets = param_set['generic_sets']
         top_params = param_set['top_params']
@@ -71,20 +87,31 @@ def register_coretest_with_vunit(vu, test, test_output_directory):
             test_output_directory, test['core_name'], 'generated_{}'.format(h))
         if os.path.exists(generation_directory):
             shutil.rmtree(generation_directory)
-            logger.debug('Removing directory {}'.format(generation_directory))
+        logger.debug('Removing directory {}'.format(generation_directory))
         os.makedirs(generation_directory)
+        # Create this side effect object so that we can create a function
+        # that has the interface fusesoc_generator expects but we can still
+        # get access to the 'resolved' from parsing.
         filenames = fusesoc_generators.get_filenames_from_core(
             generation_directory, test['core_name'], test['entity_name'],
             generic_sets, top_params, add_slvcodec_files)
-        test_utils.register_test_with_vunit(
+        ftb_directory = os.path.join(generation_directory, 'ftb')
+        if os.path.exists(ftb_directory):
+            shutil.rmtree(ftb_directory)
+        os.makedirs(ftb_directory)
+        generated_fns, resolved = filetestbench_generator.prepare_files(
+            directory=ftb_directory, filenames=filenames,
+            top_entity=test['entity_name'])
+        combined_filenames = filenames + generated_fns
+        register_rawtest_with_vunit(
             vu=vu,
-            directory=generation_directory,
-            filenames=filenames,
+            resolved=resolved,
+            filenames=combined_filenames,
             top_entity=test['entity_name'],
             all_generics=generic_sets,
             test_class=test['generator'],
             top_params=top_params,
-            )
+        )
 
 
 def run_vunit(tests, cores_roots, test_output_directory):

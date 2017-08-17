@@ -1,7 +1,7 @@
 import logging
 
-from slvcodec import symbolic_math, typs, typ_parser
-from vunit import vhdl_parser
+from slvcodec import symbolic_math, typs, typ_parser, vhdl_parser
+
 
 logger = logging.getLogger(__name__)
 

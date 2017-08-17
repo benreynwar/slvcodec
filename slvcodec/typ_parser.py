@@ -1,9 +1,8 @@
 import re
 import logging
 
-from vunit import vhdl_parser
+from slvcodec import symbolic_math, typs,  vhdl_parser
 
-from slvcodec import symbolic_math, typs
 
 logger = logging.getLogger(__name__)
 

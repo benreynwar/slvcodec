@@ -6,9 +6,10 @@ from collections import namedtuple
 
 from slvcodec import test_utils, config
 
-testoutput_dir = os.path.join(os.path.dirname(__file__), '..', 'test_outputs')
-coresdir = os.path.join(os.path.dirname(__file__), 'cores')
-vhdl_dir = os.path.join(os.path.dirname(__file__), 'vhdl')
+this_dir = os.path.abspath(os.path.dirname(__file__))
+testoutput_dir = os.path.join(this_dir, '..', 'test_outputs')
+coresdir = os.path.join(this_dir, 'cores')
+vhdl_dir = os.path.join(this_dir, 'vhdl')
 
 
 class DummyChecker:
@@ -50,7 +51,7 @@ SimulatorArgs = namedtuple(
     'SimulatorArgs', ['output_path', 'gui', 'gtkwave_fmt', 'gtkwave_args'])
 
 
-def test_vunit_simple_integeration():
+def test_vunit_simple_integration():
     thistestoutput_dir = os.path.join(testoutput_dir, 'integration')
     if os.path.exists(thistestoutput_dir):
         shutil.rmtree(thistestoutput_dir)
