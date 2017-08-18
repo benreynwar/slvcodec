@@ -12,7 +12,7 @@ def list_of_uints_to_uint(list_of_uints, width):
         output = 0
         f = pow(2, width)
         for v in reversed(list_of_uints):
-            assert(v < f)
+            assert v < f
             output += v
             output *= f
         output //= f
@@ -37,11 +37,14 @@ def uint_to_list_of_uints(uint, size, width):
         for i in range(size):
             output.append(residual % f)
             residual = residual >> width
-        assert(residual == 0)
+        assert residual == 0
     return output
 
 
 def sint_to_uint(sint, width):
+    '''
+    Convert a signed integer to an unsigned integer.
+    '''
     if sint is None:
         uint = None
     else:
@@ -50,6 +53,9 @@ def sint_to_uint(sint, width):
 
 
 def uint_to_sint(uint, width):
+    '''
+    Convert an unsigned integer to a signed integer.
+    '''
     if uint is None:
         sint = None
     else:
@@ -58,6 +64,9 @@ def uint_to_sint(uint, width):
 
 
 def list_of_sints_to_uint(list_of_sints, width):
+    '''
+    Convert a list of signed integers to an unsigned integer.
+    '''
     if None in list_of_sints:
         uint = None
     else:
@@ -67,6 +76,9 @@ def list_of_sints_to_uint(list_of_sints, width):
 
 
 def uint_to_list_of_sints(uint, size, width):
+    '''
+    Convert an unsigned integer to a list of signed integers.
+    '''
     if uint is None:
         list_of_sints = None
     else:
@@ -76,6 +88,9 @@ def uint_to_list_of_sints(uint, size, width):
 
 
 def slv_to_uint(slv):
+    '''
+    Convert a string of '0' and '1' to an unsigned integer.
+    '''
     total = 0
     f = 1
     for ch in reversed(slv):
@@ -89,6 +104,9 @@ def slv_to_uint(slv):
 
 
 def uint_to_slv(uint, width):
+    '''
+    Convert an unsigned integer to a string of '0' and '1'.
+    '''
     if uint is None:
         slv = 'U' * width
     else:

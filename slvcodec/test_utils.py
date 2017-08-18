@@ -1,3 +1,8 @@
+'''
+Functions that make it easier to generate test benchs and run
+tests in vunit.
+'''
+
 import os
 import shutil
 import itertools
@@ -19,6 +24,19 @@ helper_files = os.path.join(dir_path, 'vhdl', '*.vhd')
 def register_rawtest_with_vunit(
         vu, resolved, filenames, top_entity, all_generics, test_class,
         top_params):
+    '''
+    Register a test with vunit.
+    Args:
+      `vu`: A vunit instance.
+      `resolved`: A dictionary of parsed VHDL object.
+      `filenames`: The filenames for the test.  Includes testbench.
+      `top_entity`: The name of the top level entity.
+      `all_generics`: An iterable of dictionaries of the top level generics to
+         test.
+      `test_class`: A function that takes (resolved, generics, top_params) and
+         returns an object with make_input_data and check_output_data methods.
+      `top_params`: Top level parameters to pass to the test class.
+    '''
     random_lib_name = 'lib' + str(random.randint(0, 1000))
     try:
         lib = vu.library(random_lib_name)
@@ -45,6 +63,19 @@ def register_rawtest_with_vunit(
 def register_test_with_vunit(
         vu, directory, filenames, top_entity, all_generics, test_class,
         top_params):
+    '''
+    Register a test with vunit.
+    Args:
+      `vu`: A vunit instance.
+      `directory`: A directory in which generated files are placed.
+      `filenames`: The filenames for the test.  Does not include testbench.
+      `top_entity`: The name of the top level entity.
+      `all_generics`: An iterable of dictionaries of the top level generics to
+         test.
+      `test_class`: A function that takes (resolved, generics, top_params) and
+         returns an object with make_input_data and check_output_data methods.
+      `top_params`: Top level parameters to pass to the test class.
+    '''
     ftb_directory = os.path.join(directory, 'ftb')
     if os.path.exists(ftb_directory):
         shutil.rmtree(ftb_directory)
@@ -67,6 +98,18 @@ def register_test_with_vunit(
 
 
 def register_coretest_with_vunit(vu, test, test_output_directory):
+    '''
+    Register a test with vunit.
+    Args:
+      `vu`: A vunit instance.
+      `test_output_directory`: A directory in which generated files are placed.
+      `test`: A dictionary containing:
+        `param_sets`: An iteratable of top_params with lists of generics.  
+        `core_name`: The name of the fusesoc core to test.
+        `top_entity`: The name of the entity to test.
+        `generator`: A function that takes (resolved, generics, top_params) and
+         returns an object with make_input_data and check_output_data methods.
+    '''
     if 'param_sets' in test:
         param_sets = test['param_sets']
     elif 'all_generics' in test:
@@ -115,6 +158,9 @@ def register_coretest_with_vunit(vu, test, test_output_directory):
 
 
 def run_vunit(tests, cores_roots, test_output_directory):
+    '''
+    Setup vunit, register the tests, and run them.
+    '''
     vu = config.setup_vunit()
     config.setup_logging(vu.log_level)
     config.setup_fusesoc(cores_roots)
@@ -124,7 +170,13 @@ def run_vunit(tests, cores_roots, test_output_directory):
 
 
 def make_pre_config(test, entity, generics):
+    '''
+    Create a function to run before running the simulator.
+    '''
     def pre_config(output_path):
+        '''
+        Generate the input data and write it to a file.
+        '''
         i_data = test.make_input_data()
         lines = [entity.inputs_to_slv(line, generics=generics) for line in i_data]
         datainfilename = os.path.join(output_path, 'indata.dat')
@@ -135,7 +187,14 @@ def make_pre_config(test, entity, generics):
 
 
 def make_post_check(test, entity, generics):
+    '''
+    Create a function to run after running the simulator.
+    '''
     def post_check(output_path):
+        '''
+        Read the input data and output data and run the check_output_data
+        function to verify that the test passes.
+        '''
         # Read input data
         datainfilename = os.path.join(output_path, 'indata.dat')
         with open(datainfilename, 'r') as f:
@@ -154,6 +213,10 @@ def make_post_check(test, entity, generics):
 
 
 def make_generics(**kwargs):
+    '''
+    Given all the possible values for each generic parameters, creates
+    a list of all the possible generic dictionaries.
+    '''
     all_parameter_values = kwargs.values()
     all_parameter_names = kwargs.keys()
     parameter_sets = itertools.product(*all_parameter_values)
@@ -163,6 +226,10 @@ def make_generics(**kwargs):
 
 
 class WrapperTest:
+    '''
+    Wraps a number of tests providing make_input_data and check_output_data
+    methods into a single test with the same interface.
+    '''
 
     def __init__(self, subtests):
         self.subtests = subtests

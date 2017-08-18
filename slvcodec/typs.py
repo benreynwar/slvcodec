@@ -2,6 +2,7 @@ import logging
 
 from slvcodec import symbolic_math, conversions
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -10,6 +11,10 @@ class ResolutionError(Exception):
 
 
 class Generic:
+    '''
+    A generic parameter.  When the generic cannot be resolved this object
+    is used in the expression until resolution is possible.
+    '''
 
     def __init__(self, name, typ, default=None):
         self.name = name
@@ -21,6 +26,10 @@ class Generic:
 
 
 def make_substitute_generics_function(d):
+    '''
+    Makes a function that replaces 'Generic' objects with the appropriate
+    value from the dictionary 'd'.
+    '''
     def substitute(item):
         if isinstance(item, Generic):
             o = d.get(item.name, item)
@@ -31,24 +40,18 @@ def make_substitute_generics_function(d):
 
 
 def apply_generics(generics, expression):
+    '''
+    Resolve generic objects in the expression.
+    '''
     substituted = make_substitute_generics_function(generics)(expression)
     value = symbolic_math.get_value(substituted)
     return value
 
 
-class UnresolvedConstant:
-
-    def __init__(self, name):
-        self.name = name
-
-    def value(self):
-        raise Exception('Constant {} is not resolved'.format(self.name))
-
-    def str_expression(self):
-        return self.name
-
-
 class Constant:
+    '''
+    A constant connected to an expression or value that defines it.
+    '''
 
     def __init__(self, name, expression):
         self.name = name
@@ -62,6 +65,10 @@ class Constant:
 
 
 def resolve_expression(e, constants):
+    '''
+    Replace all strings in an expression with the appropriate `Constant`
+    objects.
+    '''
     constant_dependencies = symbolic_math.get_constant_list(e)
     missing_constants = set(constant_dependencies) - set(constants.keys())
     if missing_constants:
@@ -74,6 +81,9 @@ def resolve_expression(e, constants):
 
 
 class StdLogic:
+    '''
+    A python descriptions of the std_logic vhdl type.
+    '''
 
     width = 1
     resolved = True
@@ -105,6 +115,10 @@ std_logic = StdLogic()
 
 
 class UnresolvedConstrainedArray:
+    '''
+    An array with a constrained length, but where the types and constants
+    that define it are not yet resolved.
+    '''
 
     resolved = False
 
@@ -136,6 +150,10 @@ class UnresolvedConstrainedArray:
 
 
 class ConstrainedArray:
+    '''
+    An array with a constrained length.  The types and constants that define
+    it have been resolved.
+    '''
 
     resolved = True
 
@@ -146,16 +164,17 @@ class ConstrainedArray:
         self.width = symbolic_math.Multiplication(
             powers=(symbolic_math.Power(number=1, expression=self.size),
                     symbolic_math.Power(number=1, expression=self.unconstrained_type.subtype.width),
-                    ))
+                   ))
 
     def __str__(self):
         s = '{}({}-1 downto 0)'.format(
-            self.unconstrained_type.identifier, symbolic_math.str_expression(self.size))
+            self.unconstrained_type.identifier, symbolic_math.str_expression(
+                self.size))
         return s
 
     def to_slv(self, data, generics):
         size = apply_generics(generics, self.size)
-        assert(len(data) == size)
+        assert len(data) == size
         slv = self.unconstrained_type.to_slv(data, generics)
         return slv
 
@@ -169,11 +188,14 @@ class ConstrainedArray:
     def from_slv(self, slv, generics):
         data = self.unconstrained_type.from_slv(slv, generics)
         size = apply_generics(generics, self.size)
-        assert(len(data) == size)
+        assert len(data) == size
         return data
 
 
 class UnresolvedArray:
+    '''
+    An array without defined length and with types and constant unresolved.
+    '''
 
     resolved = False
 
@@ -200,6 +222,9 @@ class UnresolvedArray:
 
 
 class Array:
+    '''
+    An array without defined length and with types and constant resolved.
+    '''
 
     resolved = True
 
@@ -214,22 +239,29 @@ class Array:
     def from_slv(self, slv, generics):
         w = apply_generics(generics, self.subtype.width)
         intw = int(w)
-        assert(intw == w)
-        assert(len(slv) % intw == 0)
+        assert intw == w
+        assert len(slv) % intw == 0
         n = len(slv)//intw
-        assert(n * intw == len(slv))
+        assert n * intw == len(slv)
         slv_pieces = [slv[i*intw: (i+1)*intw] for i in range(n)]
         data = list(reversed([self.subtype.from_slv(piece, generics) for piece in slv_pieces]))
         return data
 
 
 class StdLogicVector(Array):
+    '''
+    A python description of the std_logic_vector type.
+    '''
 
     def __init__(self):
         Array.__init__(self, identifier='std_logic_vector', subtype=std_logic)
 
 
 class UnresolvedConstrainedStdLogicVector(StdLogicVector):
+    '''
+    A std_logic_vector with a defined length but with the constants that
+    define the length unresolved.
+    '''
 
     resolved = False
     type_dependencies = tuple()
@@ -251,6 +283,10 @@ class UnconstrainedStdLogicVector:
 
 
 class ConstrainedStdLogicVector:
+    '''
+    A std_logic_vector with a defined length, with the constants that
+    define the length resolved.
+    '''
 
     unconstrained_name = 'std_logic_vector'
     unconstrained_type = UnconstrainedStdLogicVector
@@ -368,6 +404,9 @@ class ConstrainedSigned(ConstrainedStdLogicVector):
 
 
 def type_width_constant(typ):
+    '''
+    Determine the width of a type to use in an expression.
+    '''
     if isinstance(typ, StdLogic):
         width = '1'
     elif isinstance(typ, ConstrainedStdLogicVector):

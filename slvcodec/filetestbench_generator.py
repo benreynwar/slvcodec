@@ -9,31 +9,41 @@ logger = logging.getLogger(__name__)
 
 
 def make_filetestbench(enty):
-    # Make records for inputs and outputs.
+    '''
+    Generate a testbench that reads inputs from a file, and writes outputs to
+    a file.
+    Args:
+      `enty`: A resolved entity object parsed from the VHDL.
+    '''
+    # Generate a record type for the entity inputs (excluding clock).
     inputs = [p for p in enty.ports.values()
               if p.direction == 'in' and p.name not in entity.CLOCK_NAMES]
-    outputs = [p for p in enty.ports.values() if p.direction == 'out']
     input_names_and_types = [(p.name, p.typ) for p in inputs]
+    input_record = typs.Record('t_input', input_names_and_types)
+    # Generate a record type for the entity outputs.
+    outputs = [p for p in enty.ports.values() if p.direction == 'out']
     output_names_and_types = [(p.name, p.typ) for p in outputs]
-    input_record = typs.Record(
-        't_input'.format(enty.identifier), input_names_and_types)
-    output_record = typs.Record(
-        't_output'.format(enty.identifier), output_names_and_types)
-    input_slv_declarations, input_slv_definitions = package_generator.make_record_declarations_and_definitions(
-        input_record)
-    output_slv_declarations, output_slv_definitions = package_generator.make_record_declarations_and_definitions(
-        output_record)
-    template_fn = os.path.join(os.path.dirname(__file__), 'templates', 'file_testbench.vhd')
-    with open(template_fn, 'r') as f:
-        filetestbench_template = jinja2.Template(f.read())
+    output_record = typs.Record('t_output', output_names_and_types)
+    # Generate declarations and definitions for the functions to convert
+    # the input and output types to and from std_logic_vector.
+    input_slv_declarations, input_slv_definitions = (
+        package_generator.make_record_declarations_and_definitions(
+            input_record))
+    output_slv_declarations, output_slv_definitions = (
+        package_generator.make_record_declarations_and_definitions(
+            output_record))
+    # Generate use clauses required by the testbench.
     use_clauses = '\n'.join([
         'use {}.{}.{};'.format(u.library, u.design_unit, u.name_within)
         for u in enty.uses.values()])
     use_clauses += '\n' + '\n'.join([
         'use {}.{}_slvcodec.{};'.format(u.library, u.design_unit, u.name_within)
         for u in enty.uses.values() if u.library not in ('ieee', 'std') and '_slvcodec' not in u.design_unit])
+    # Get the list of generic parameters for the testbench.
     generic_params = '\n'.join(['{}: {};'.format(g.name, g.typ)
                                 for g in enty.generics.values()])
+    # Combine the input and output record definitions with the slv conversion
+    # functions.
     definitions = '\n'.join([
         input_record.declaration(), output_record.declaration(),
         input_slv_declarations, input_slv_definitions,
@@ -46,6 +56,11 @@ def make_filetestbench(enty):
                               for p in enty.ports.values() if p.name not in clk_names])
     dut_generics = ',\n'.join(['{} => {}'.format(g.name, g.name)
                                for g in enty.generics.values()])
+    # Read in the testbench template and format it.
+    template_fn = os.path.join(os.path.dirname(__file__), 'templates',
+                               'file_testbench.vhd')
+    with open(template_fn, 'r') as f:
+        filetestbench_template = jinja2.Template(f.read())
     filetestbench = filetestbench_template.render(
         test_name='{}_tb'.format(enty.identifier),
         use_clauses=use_clauses,
@@ -60,6 +75,11 @@ def make_filetestbench(enty):
 
 
 def prepare_files(directory, filenames, top_entity):
+    '''
+    Parses VHDL files, and generates a testbench for `top_entity`.
+    Returns a tuple of a list of testbench files, and a dictionary
+    of parsed objects.
+    '''
     entities, packages = entity.process_files(filenames)
     resolved_entity = entities[top_entity]
     new_fns = [
@@ -82,6 +102,10 @@ def prepare_files(directory, filenames, top_entity):
 
 
 def add_slvcodec_files(directory, filenames):
+    '''
+    Parses files, and generates helper packages for existing packages that
+    contain functions to convert types to and from std_logic_vector.
+    '''
     entities, packages = entity.process_files(filenames, must_resolve=False)
     combined_filenames = [os.path.join(config.vhdldir, 'txt_util.vhd'),
                           os.path.join(config.vhdldir, 'slvcodec.vhd')]
@@ -98,14 +122,3 @@ def add_slvcodec_files(directory, filenames):
         else:
             combined_filenames.append(fn)
     return combined_filenames
-
-
-if __name__ == '__main__':
-    filenames = (
-        'tests/vhdl_type_pkg.vhd',
-        'tests/dummy.vhd',
-        )
-    top_entity = 'dummy'
-    directory = 'deleteme'
-    os.makedirs(directory)
-    prepare_files(directory, filenames, top_entity)

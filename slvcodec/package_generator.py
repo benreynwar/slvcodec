@@ -5,10 +5,12 @@ convert the types back and forth to std_logic_vector.
 
 
 import os
-import jinja2
 import logging
 
+import jinja2
+
 from slvcodec import typs, symbolic_math
+
 
 logger = logging.getLogger(__name__)
 

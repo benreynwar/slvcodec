@@ -1,8 +1,16 @@
+'''
+Functions to deal with doing math on algebraic strings.
+Useful for parsing VHDL.
+'''
+
 import tokenize
 import logging
 import math
 from collections import namedtuple
 from io import StringIO
+
+
+logger = logging.getLogger(__name__)
 
 
 def logceil(argument):
@@ -47,10 +55,7 @@ def is_number(v):
     Whether the value is or can be converted to a number.
     '''
     o = as_number(v)
-    return (o is not None)
-
-
-logger = logging.getLogger(__name__)
+    return o is not None
 
 
 def transform(item, f):
@@ -724,56 +729,3 @@ def parse_and_simplify(s):
     parsed = parse_string(s)
     simplified = simplify(parsed)
     return simplified
-
-
-def test_substitute():
-    string = 'fish + 3 * bear * shark / house'
-    simplified = parse_and_simplify(string)
-    substituted = make_substitute_function({
-        'fish': 2,
-        'bear': 4,
-        'shark': 3,
-        'house': 2,
-        })(simplified)
-    final = simplify(substituted)
-    assert(final == 2 + 3 * 4 * 3 / 2)
-
-
-def test_constant_list():
-    string = '3 * (fish + 6) - 2 * bear - fish'
-    simplified = parse_and_simplify(string)
-    constants = get_constant_list(simplified)
-    assert(constants == set(['fish', 'bear']))
-
-def test_empty_constant_list():
-    string = '3 * 12'
-    simplified = parse_and_simplify(string)
-    constants = get_constant_list(simplified)
-    assert(constants == set())
-
-
-def test_simplifications():
-    ins_and_outs = (
-        ('fish + 8*bear + 2 * (fish - bear)',
-         ('(3*fish+6*bear)', '(6*bear+3*fish)')),
-        ('4 + (4 - 4) * 2 - 3', ('1',)),
-        ('7 * 7', ('49',)),
-        ('2 * (3 + 5)', ('16',)),
-        ('logceil(5+3)-2', ('1',)),
-        ('1 + 1', ('2',)),
-        ('(logceil(5*4)-1)+1-0', ('5',)),
-        ('3 * 2 / fish / (3 / 4)', ('8/fish', '8*1/fish')),
-        ('fish + 1 - 1', ('fish',)),
-        ('(fish + 1) - 1', ('fish',)),
-        ('fish + 2 * fish', ('3*fish',)),
-        )
-    for in_string, expected_strings in ins_and_outs:
-        simplified = parse_and_simplify(in_string)
-        out_string = str_expression(simplified)
-        assert(out_string in expected_strings)
-
-if __name__ == '__main__':
-    test_simplifications()
-    test_constant_list()
-    test_empty_constant_list()
-    test_substitute()
