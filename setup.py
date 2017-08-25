@@ -22,6 +22,6 @@ setup(
         'vunit-hdl',
     ],
     dependency_links=[
-        'git+https://github.com/benreynwar/fusesoc_generators@6da111de84c1231b516df403012bf90831827586#egg=fusesoc_generators-0.0.0',
+        'git+https://github.com/benreynwar/fusesoc_generators@aef6f2ceac44ced285c0cce75b276495276cbf85#egg=fusesoc_generators-0.0.0',
     ],
 )

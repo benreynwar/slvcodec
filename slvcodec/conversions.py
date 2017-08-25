@@ -47,8 +47,10 @@ def sint_to_uint(sint, width):
     '''
     if sint is None:
         uint = None
+    elif sint < 0:
+        uint = sint + pow(2, width)
     else:
-        uint = sint + pow(2, width-1)
+        uint = sint
     return uint
 
 
@@ -58,8 +60,10 @@ def uint_to_sint(uint, width):
     '''
     if uint is None:
         sint = None
+    elif uint > pow(2, width-1)-1:
+        sint = uint - pow(2, width)
     else:
-        sint = uint - pow(2, width-1)
+        sint = uint
     return sint
 
 
