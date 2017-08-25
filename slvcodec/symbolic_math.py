@@ -726,6 +726,8 @@ def parse_and_simplify(s):
     '''
     Tokenize, parse and simplify a string.
     '''
+    if s == '':
+        raise ValueError('Cannot parse an empty string')
     parsed = parse_string(s)
     simplified = simplify(parsed)
     return simplified

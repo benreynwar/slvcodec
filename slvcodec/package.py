@@ -61,8 +61,13 @@ def process_parsed_package(parsed_package):
     '''
     p_constants = parsed_package.packages[0].constants
     p_types = get_types(parsed_package.packages[0])
-    constants = dict([(c.identifier, symbolic_math.parse_and_simplify(c.text))
-                      for c in p_constants])
+    constants = []
+    for c in p_constants:
+        if c.text == '':
+            # This typically happens when a parameters file has been generated
+            # incorrectly.
+            raise Exception('Constant {} has no value to parse'.format(c.identifier))
+        constants[c.identifier] = symbolic_math.parse_and_simplify(c.text)
     processed_types = [(t.identifier, typ_parser.process_parsed_type(t))
                   for t in p_types]
     # Filter out the types that could not be processed.
