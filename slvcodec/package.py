@@ -61,7 +61,7 @@ def process_parsed_package(parsed_package):
     '''
     p_constants = parsed_package.packages[0].constants
     p_types = get_types(parsed_package.packages[0])
-    constants = []
+    constants = {}
     for c in p_constants:
         if c.text == '':
             # This typically happens when a parameters file has been generated
