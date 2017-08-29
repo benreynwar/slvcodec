@@ -37,7 +37,7 @@ def register_rawtest_with_vunit(
          returns an object with make_input_data and check_output_data methods.
       `top_params`: Top level parameters to pass to the test class.
     '''
-    random_lib_name = 'lib' + str(random.randint(0, 1000))
+    random_lib_name = 'lib' + str(random.randint(0, 1000000))
     try:
         lib = vu.library(random_lib_name)
     except KeyError:
@@ -46,14 +46,21 @@ def register_rawtest_with_vunit(
     lib.add_source_files(filenames)
     tb_generated = lib.entity(top_entity + '_tb')
     entity = resolved['entities'][top_entity]
+    names = {}
     for generics in all_generics:
         test = test_class(resolved, generics, top_params)
         name = str(generics)
         if len(name) > 30:
-            h = hash(params_helper.make_hashable(generics))
-            name = str(h)
+            short = str([(k[:6], str(v)[:8]) for k, v in generics.items()])
+            name = short[:80]
+        if name not in names:
+            names[name] = 1
+            name_with_suffix = name
+        else:
+            names[name] += 1
+            name_with_suffix = name + '_' + str(names[name])
         tb_generated.add_config(
-            name=name,
+            name=name_with_suffix,
             generics=generics,
             pre_config=make_pre_config(test, entity, generics),
             post_check=make_post_check(test, entity, generics),
