@@ -1,0 +1,9 @@
+CAPI=1
+[main]
+name = complex_pkg
+description = A package with types for complex data.
+
+[fileset rtl]
+files =
+  complex_pkg.vhd
+file_type = vhdlSource

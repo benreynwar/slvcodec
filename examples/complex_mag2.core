@@ -1,0 +1,10 @@
+CAPI=1
+[main]
+name = complex_mag2
+description = Returns the magnitude squared of a complex number.
+depend = complex_pkg
+
+[fileset rtl]
+files =
+  complex_mag2.vhd
+file_type = vhdlSource
