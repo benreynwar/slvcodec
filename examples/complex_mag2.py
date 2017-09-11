@@ -36,34 +36,30 @@ class ComplexMag2Test:
         assert all([d < allowed_error for d in differences])
 
 
-def get_tests():
-    test = {
-        'core_name': 'complex_mag2',
-        'entity_name': 'complex_mag2',
-        'all_generics': [{}],
-        'generator': ComplexMag2Test,
-    }
-    return [test]
-
 if __name__ == '__main__':
     random.seed(0)
-    # Get the tests for this module.
-    tests = get_tests()
     # Initialize vunit with command line parameters.
     vu = config.setup_vunit()
     # Set up logging.
     config.setup_logging(vu.log_level)
-    # Tell fusesoc that the core files are in this directory.
-    logger.info('************************')
+    # Get filenames for test
     import os
     this_dir = os.path.dirname(os.path.realpath(__file__))
-    logger.info('this dir is {}'.format(this_dir))
-    config.setup_fusesoc(cores_roots=[this_dir])
-    # Register all the tests with VUnit.
+    filenames = [
+        os.path.join(this_dir, 'complex_pkg.vhd'),
+        os.path.join(this_dir, 'complex_mag2.vhd'),
+        ]
+    # Register the test with VUnit.
     test_output_directory = os.path.join(this_dir, 'generated')
-    for test in tests:
-        test_utils.register_coretest_with_vunit(
-            vu, test, test_output_directory=test_output_directory)
+    test_utils.register_test_with_vunit(
+        vu=vu,
+        directory=test_output_directory,
+        filenames=filenames,
+        top_entity='complex_mag2',
+        all_generics=[{}],
+        test_class=ComplexMag2Test,
+        top_params={},
+        )
     # Run the tests with VUnit
     vu.set_sim_option('disable_ieee_warnings', True)
     vu.main()
