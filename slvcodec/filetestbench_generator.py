@@ -111,14 +111,14 @@ def add_slvcodec_files(directory, filenames):
                           os.path.join(config.vhdldir, 'slvcodec.vhd')]
     for fn in filenames:
         parsed = package.parsed_from_filename(fn)
-        if parsed.packages:
+        if fn not in combined_filenames:
+            combined_filenames.append(fn)
+        if parsed.packages and fn[-len('slvcodec.vhd'):] != 'slvcodec.vhd':
             package_name = parsed.packages[0].identifier
             slvcodec_pkg = package_generator.make_slvcodec_package(packages[package_name])
             slvcodec_package_filename = os.path.join(
                 directory, '{}_slvcodec.vhd'.format(package_name))
             with open(slvcodec_package_filename, 'w') as f:
                 f.write(slvcodec_pkg)
-            combined_filenames += (fn, slvcodec_package_filename)
-        else:
-            combined_filenames.append(fn)
+            combined_filenames.append(slvcodec_package_filename)
     return combined_filenames

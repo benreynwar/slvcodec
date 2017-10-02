@@ -121,6 +121,8 @@ def resolve_packages(packages):
                 any_resolved = True
                 resolved_package_names.append(pn)
                 resolved_pd[pn] = resolved
+            else:
+                logger.debug('Trying to resolve {} but has unresolved dependencies {}'.format(pn, set(dependencies) - set(resolved_package_names)))
         toresolve_package_names = [x for x in toresolve_package_names
                                    if x not in resolved_package_names]
         if not any_resolved:
@@ -194,6 +196,8 @@ def resolve_dependencies(available, unresolved, dependencies, resolve_function):
             elif not (set(item_dependencies) - set(available_names)):
                 any_changes = True
                 failed_to_resolve = False
+                resolved_item = resolve_function(
+                    unresolved_name, unresolved_item, updated_available)
                 try:
                     resolved_item = resolve_function(
                         unresolved_name, unresolved_item, updated_available)
