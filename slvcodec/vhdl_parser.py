@@ -720,7 +720,7 @@ class RangeParser(object):
     _constrained_range_re = re.compile(r"""
         \s*(?P<range_left>.+?)
         \s+(?P<direction>to|downto)\s+
-        (?P<range_right>.+?)\s*""", re.MULTILINE | re.IGNORECASE | re.VERBOSE | re.DOTALL)
+        (?P<range_right>.+?)\s*$""", re.MULTILINE | re.IGNORECASE | re.VERBOSE | re.DOTALL)
 
     _range_attribute_range_re = re.compile(r"""
         \s*(?P<range_attribute>[a-zA-Z][\w]*'range)\s*""", re.MULTILINE | re.IGNORECASE | re.VERBOSE | re.DOTALL)
