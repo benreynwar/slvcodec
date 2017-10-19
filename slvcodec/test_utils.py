@@ -49,10 +49,7 @@ def register_rawtest_with_vunit(
     names = {}
     for generics in all_generics:
         test = test_class(resolved, generics, top_params)
-        name = str(generics)
-        if len(name) > 30:
-            short = str([(k[:6], str(v)[:8]) for k, v in generics.items()])
-            name = short[:80]
+        name = str(random.randint(0, 1000000))
         if name not in names:
             names[name] = 1
             name_with_suffix = name
@@ -260,3 +257,18 @@ class WrapperTest:
             sub_input_data = input_data[start_index: end_index]
             sub_output_data = output_data[start_index: end_index]
             test.check_output_data(sub_input_data, sub_output_data)
+
+
+def split_data(is_splits, data):
+    split_datas = []
+    this_data = None
+    for is_split, d in zip(is_splits, data):
+        if is_split:
+            if this_data is not None:
+                split_datas.append(this_data)
+            this_data = []
+        if this_data is not None:
+            this_data.append(d)
+    if this_data:
+        split_datas.append(this_data)
+    return split_datas
