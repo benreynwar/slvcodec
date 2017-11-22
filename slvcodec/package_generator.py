@@ -163,7 +163,7 @@ def make_slvcodec_package(pkg):
     use_lines.append('use work.{}.all;'.format(pkg.identifier))
     use_lines.append('use work.slvcodec.all;'.format(pkg.identifier))
     library_lines = ['library {};'.format(library) for library in libraries]
-    template = """{library_lines}
+    package_template = """{library_lines}
 {use_lines}
 
 package {package_name} is
@@ -171,18 +171,23 @@ package {package_name} is
 {declarations}
 
 end package;
-
+"""
+    package_body_template = """
 package body {package_name} is
 
 {definitions}
 
 end package body;
 """
-    slvcodec_pkg = template.format(
+    slvcodec_pkg = package_template.format(
         library_lines='\n'.join(library_lines),
         use_lines='\n'.join(use_lines),
         package_name=pkg.identifier+'_slvcodec',
         declarations=combined_declarations,
-        definitions=combined_definitions,
         )
+    if combined_definitions:
+        slvcodec_pkg += package_body_template.format(
+            package_name=pkg.identifier+'_slvcodec',
+            definitions=combined_definitions,
+            )
     return slvcodec_pkg
