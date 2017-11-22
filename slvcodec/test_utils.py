@@ -259,9 +259,12 @@ class WrapperTest:
             test.check_output_data(sub_input_data, sub_output_data)
 
 
-def split_data(is_splits, data):
+def split_data(is_splits, data, include_initial=False):
     split_datas = []
-    this_data = None
+    if include_initial:
+        this_data = []
+    else:
+        this_data = None
     for is_split, d in zip(is_splits, data):
         if is_split:
             if this_data is not None:
