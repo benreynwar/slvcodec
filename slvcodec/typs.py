@@ -1,12 +1,12 @@
 import logging
 
-from slvcodec import symbolic_math, conversions
+from slvcodec import symbolic_math, conversions, errors
 
 
 logger = logging.getLogger(__name__)
 
 
-class ResolutionError(Exception):
+class ToSlvError(Exception):
     pass
 
 
@@ -72,7 +72,7 @@ def resolve_expression(e, constants):
     constant_dependencies = symbolic_math.get_constant_list(e)
     missing_constants = set(constant_dependencies) - set(constants.keys())
     if missing_constants:
-        raise ResolutionError('Missing constants {}'.format(missing_constants))
+        raise errors.ResolutionError('Missing constants {}'.format(missing_constants))
     if constant_dependencies:
         resolved_e = symbolic_math.make_substitute_function(constants)(e)
     else:
@@ -87,16 +87,21 @@ class StdLogic:
 
     width = 1
     resolved = True
+    unconstrained = False
 
     def __str__(self):
         return 'std_logic'
 
     def to_slv(self, data, generics):
-        assert(data in (0, 1))
-        if data:
+        if data not in (0, 1, None):
+            raise ToSlvError('Value received for std_logic is {}.  Allowed values are 0, 1 or None.'.format(
+                data))
+        if data == 1:
             slv = '1'
-        else:
+        elif data == 0:
             slv = '0'
+        else:
+            slv = 'U'
         return slv
 
     def from_slv(self, slv, generics):
@@ -121,6 +126,7 @@ class UnresolvedConstrainedArray:
     '''
 
     resolved = False
+    unconstrained = False
 
     def __init__(self, identifier, size, unconstrained_type_identifier=None,
                  unconstrained_type=None):
@@ -137,7 +143,10 @@ class UnresolvedConstrainedArray:
 
     def resolve(self, types, constants):
         if self.unconstrained_type_identifier is not None:
-            unconstrained_type = types.get(self.unconstrained_type_identifier)
+            if self.unconstrained_type_identifier not in types:
+                raise errors.ResolutionError(
+                    '{} is not a known type.'.format(self.unconstrained_type_identifier))
+            unconstrained_type = types[self.unconstrained_type_identifier]
         else:
             unconstrained_type = self.unconstrained_type.resolve(types, constants)
         size = resolve_expression(self.size, constants)
@@ -156,6 +165,7 @@ class ConstrainedArray:
     '''
 
     resolved = True
+    unconstrained = False
 
     def __init__(self, identifier, unconstrained_type, size, constants):
         self.identifier = identifier
@@ -174,7 +184,15 @@ class ConstrainedArray:
 
     def to_slv(self, data, generics):
         size = apply_generics(generics, self.size)
-        assert len(data) == size
+        if data is None:
+            data = [None] * size
+        try:
+            if len(data) != size:
+                raise ToSlvError('Length {} does not match expected length {}.'.format(
+                    len(data), size))
+        except TypeError as e:
+            raise ToSlvError('Data is "{}" and does not have a length.  Expected length is {}.'.format(
+                data, size)) from e
         slv = self.unconstrained_type.to_slv(data, generics)
         return slv
 
@@ -198,6 +216,7 @@ class UnresolvedArray:
     '''
 
     resolved = False
+    unconstrained = True
 
     def __init__(self, identifier, subtype_identifier=None, subtype=None):
         assert((subtype is None) or (subtype_identifier is None))
@@ -227,12 +246,15 @@ class Array:
     '''
 
     resolved = True
+    unconstrained = True
 
     def __init__(self, identifier, subtype):
         self.identifier = identifier
         self.subtype = subtype
 
     def to_slv(self, data, generics):
+        if data is None:
+            raise ToSlvError('Cannot convert None to binary for an unconstrained array.')
         slv = ''.join([self.subtype.to_slv(d, generics) for d in reversed(data)])
         return slv
 
@@ -257,6 +279,9 @@ class StdLogicVector(Array):
         Array.__init__(self, identifier='std_logic_vector', subtype=std_logic)
 
 
+std_logic_vector = StdLogicVector()
+
+
 class UnresolvedConstrainedStdLogicVector(StdLogicVector):
     '''
     A std_logic_vector with a defined length but with the constants that
@@ -265,6 +290,7 @@ class UnresolvedConstrainedStdLogicVector(StdLogicVector):
 
     resolved = False
     type_dependencies = tuple()
+    unconstrained = False
 
     def __init__(self, identifier, size):
         self.identifier = identifier
@@ -277,11 +303,6 @@ class UnresolvedConstrainedStdLogicVector(StdLogicVector):
         return resolved
 
 
-class UnconstrainedStdLogicVector:
-
-    identifier = 'std_logic_vector'
-
-
 class ConstrainedStdLogicVector:
     '''
     A std_logic_vector with a defined length, with the constants that
@@ -289,7 +310,8 @@ class ConstrainedStdLogicVector:
     '''
 
     unconstrained_name = 'std_logic_vector'
-    unconstrained_type = UnconstrainedStdLogicVector
+    unconstrained_type = StdLogicVector()
+    unconstrained = False
 
     def __init__(self, identifier, size):
         self.identifier = identifier
@@ -307,16 +329,20 @@ class ConstrainedStdLogicVector:
 
     def to_slv(self, data, generics):
         size = int(apply_generics(generics, self.size))
-        min_value = 0
-        max_value = pow(2, size)-1
-        assert(data >= min_value)
-        assert(data <= max_value)
-        bits = []
-        for i in range(size):
-            bits.append(data % 2)
-            data = data >> 1
-        assert(data == 0)
-        slv = ''.join([std_logic.to_slv(b, generics) for b in reversed(bits)])
+        if data is None:
+            slv = 'U' * size
+        else:
+            min_value = 0
+            max_value = pow(2, size)-1
+            if (data < min_value) or (data > max_value):
+                raise ToSlvError('Value of {} received for type {}.  Should be in range {} to {}'.format(
+                    data, self.identifier, min_value, max_value))
+            bits = []
+            for i in range(size):
+                bits.append(data % 2)
+                data = data >> 1
+            assert(data == 0)
+            slv = ''.join([std_logic.to_slv(b, generics) for b in reversed(bits)])
         return slv
 
     def reduce_slv(self, slv, generics):
@@ -384,12 +410,16 @@ class ConstrainedSigned(ConstrainedStdLogicVector):
         self.min_value = -pow(2, size_value-1)
 
     def to_slv(self, data, generics):
-        assert(data >= self.min_value)
-        assert(data <= self.max_value)
         size = apply_generics(generics, self.size)
-        if data < 0:
-            data += pow(2, size)
-        slv = ConstrainedUnsigned.to_slv(self, data, generics)
+        if data is None:
+            slv = 'U' * size
+        else:
+            if (data < self.min_value) or (data > self.max_value):
+                raise ToSlvError('Value of {} received for type {}.  Should be in range {} to {}'.format(
+                    data, self.identifier, self.min_value, self.max_value))
+            if data < 0:
+                data += pow(2, size)
+            slv = ConstrainedUnsigned.to_slv(self, data, generics)
         return slv
 
     def from_slv(self, slv, generics):
@@ -422,6 +452,7 @@ def type_width_constant(typ):
 class UnresolvedRecord:
 
     resolved = False
+    unconstrained = False
 
     def __init__(self, identifier, names_and_subtypes):
         self.identifier = identifier
@@ -453,6 +484,7 @@ class UnresolvedRecord:
 class Record:
 
     resolved = True
+    unconstrained = False
 
     def __init__(self, identifier, names_and_subtypes):
         self.identifier = identifier
@@ -465,8 +497,21 @@ class Record:
         return self.identifier
 
     def to_slv(self, data, generics):
-        slvs = [
-            subtype.to_slv(data[name], generics) for name, subtype in self.names_and_subtypes]
+        if data is None:
+            data = {}
+        invalid_names = set(data.keys()) - set([name for name, subtype in self.names_and_subtypes])
+        if invalid_names:
+            raise ToSlvError('Unknown element {} in record of type {}.'.format(
+                invalid_names, self.identifier))
+        slvs = []
+        for name, subtype in self.names_and_subtypes:
+            try:
+                slvs.append(subtype.to_slv(data.get(name, None), generics))
+            except ToSlvError as e:
+                message = e.args[0]
+                new_message = 'Error in element {} in record of type {}.'.format(
+                    name, self.identifier) + '  ' + message
+                raise ToSlvError(new_message) from e
         slv = ''.join(reversed(slvs))
         return slv
 
@@ -495,6 +540,7 @@ class Enumeration:
 
     resolved = True
     type_dependencies = tuple()
+    unconstrained = False
 
     def __init__(self, identifier, literals):
         self.identifier = identifier
@@ -505,11 +551,14 @@ class Enumeration:
         return self.identifier
 
     def to_slv(self, data, generics):
-        if data.lower() not in self.literals:
-            raise Exception('Enumeration does not contain {}. Options are {}'.format(
-                data.lower(), self.literals))
-        index = self.literals.index(data.lower())
-        slv = conversions.uint_to_slv(index, self.width)
+        if data is None:
+            slv = 'U' * self.width
+        else:
+            if data.lower() not in self.literals:
+                raise ToSlvError('Enumeration does not contain {}. Options are {}'.format(
+                    data.lower(), self.literals))
+            index = self.literals.index(data.lower())
+            slv = conversions.uint_to_slv(index, self.width)
         return slv
 
     def reduce_slv(self, slv, generics):

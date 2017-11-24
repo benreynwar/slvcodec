@@ -26,8 +26,6 @@ class DummyChecker:
             'i_dummy': {
                 'manydata': [0, 0],
                 'data': 0,
-                'anint': 0,
-                'anotherint': 0,
                 'logic': 0,
                 'slv': 1,
                 },
@@ -45,10 +43,6 @@ class DummyChecker:
         o_firstdatabit = [d['o_firstdatabit'] for d in output_data]
         expected_firstdatabit = [fd % 2 for fd in expected_firstdata]
         assert o_firstdatabit == expected_firstdatabit
-
-
-SimulatorArgs = namedtuple(
-    'SimulatorArgs', ['output_path', 'gui', 'gtkwave_fmt', 'gtkwave_args'])
 
 
 def test_vunit_simple_integration():

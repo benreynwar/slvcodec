@@ -1,8 +1,7 @@
 import collections
 import logging
 
-from slvcodec import package, typ_parser, symbolic_math, typs
-from slvcodec.typs import ResolutionError
+from slvcodec import package, typ_parser, symbolic_math, typs, errors
 
 
 logger = logging.getLogger(__name__)
@@ -70,6 +69,9 @@ class Port:
 
     def __init__(self, name, direction, typ):
         self.name = name
+        if direction == None:
+            # Default direction is 'in'.
+            direction = 'in'
         self.direction = direction
         self.typ = typ
 
@@ -98,17 +100,23 @@ class UnresolvedEntity:
                 if port.typ in available_types:
                     resolved_typ = available_types[port.typ]
                 elif isinstance(port.typ, str):
-                    raise Exception('Cannot resolve port typ {}'.format(port.typ))
+                    raise errors.ResolutionError('Failed to resolve port of type "{}".  Perhaps a use statement is missing.'.format(port.typ))
                 else:
                     resolved_typ = port.typ.resolve(available_types, available_constants)
                 resolved_port = Port(name=port.name, direction=port.direction,
                                     typ=resolved_typ)
+                if resolved_port.typ.unconstrained:
+                    raise errors.ResolutionError('Entity {}: Port {}: unconstrained port'.format(
+                        self.identifier, port.name))
                 resolved_ports[name] = resolved_port
-            except ResolutionError as e:
+            except errors.ResolutionError as e:
                 # If we can't resolve and `must_resolve` isn't True then we just
                 # skip ports that we can't resolve.
                 if must_resolve:
-                    raise e
+                    error_msg = 'Failed to resolve port {} in entity {}.'.format(
+                        self.identifier, port.name)
+                    error_msg += '  ' + e.args[0]
+                    raise errors.ResolutionError(error_msg) from e
         e = Entity(
             identifier=self.identifier,
             generics=self.generics,
@@ -137,17 +145,32 @@ class Entity(object):
     def __repr__(self):
         return str(self)
 
+    def input_ports(self):
+        input_ports = dict([
+            (port_name, port) for port_name, port in self.ports.items()
+            if (port.direction == 'in') and (port.name not in CLOCK_NAMES)])
+        return input_ports
+
     def inputs_to_slv(self, inputs, generics):
+        '''
+        Takes a dictionary of inputs, and a dictionary of generics parameters for the entity
+        and produces a string of '0's and '1's representing the input values.
+        '''
         slvs = [] 
-        for port in self.ports.values():
-            if (port.direction == 'in') and (port.name not in CLOCK_NAMES):
-                d = inputs.get(port.name, None)
-                if d is None:
-                    w = typs.make_substitute_generics_function(generics)(port.typ.width)
-                    o = 'U' * symbolic_math.get_value(w)
-                else:
-                    o = port.typ.to_slv(d, generics)
-                slvs.append(o)
+        for port in self.input_ports().values():
+            d = inputs.get(port.name, None)
+            try:
+                o = port.typ.to_slv(d, generics)
+            except typs.ToSlvError as e:
+                message = 'Failure to convert inputs to binary for entity {} and port {}.'.format(
+                    self.identifier, port.name)
+                message += '  ' + e.args[0]
+                raise typs.ToSlvError(message) from e
+            slvs.append(o)
+        invalid_input_names = set(inputs.keys()) - set(self.input_ports().keys())
+        if invalid_input_names:
+            raise typs.ToSlvError('In entity {} values given for port that does not exist: {}'.format(
+                self.identifier, invalid_input_names))
         slv = ''.join(reversed(slvs))
         return slv
 

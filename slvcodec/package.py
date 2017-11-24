@@ -85,6 +85,48 @@ def process_parsed_package(parsed_package):
     return p
 
 
+class Package(object):
+    '''
+    A package defines all the types, constants and dependencies of that package.
+    The dependencies of the types and constants on other packages have
+    been resolved.
+    '''
+
+    resolved = True
+
+    def __init__(self, identifier, types, constants, uses):
+        self.identifier = identifier
+        self.types = types
+        self.constants = constants
+        self.uses = uses
+
+    def __str__(self):
+        return 'Package({})'.format(self.identifier)
+
+    def __repr__(self):
+        return str(self)
+
+
+BUILTIN_PACKAGES = {
+    'std_logic_1164': Package(
+        identifier='std_logic_1164', constants={}, types={
+            'std_logic_vector': typs.StdLogicVector(),
+            'std_logic': typs.std_logic,
+            }, uses={}),
+    'numeric_std': Package(
+        identifier='numeric_std', constants={}, types={
+            'unsigned': typs.Unsigned(),
+            'signed': typs.Signed(),
+            }, uses={}),
+    'math_real': Package(
+        identifier='math_real', constants={}, types={
+            }, uses={}),
+    'textio': Package(
+        identifier='textio', constants={}, types={
+            }, uses={}),
+    }
+
+
 def resolve_packages(packages):
     '''
     Takes at list of packages and resolves their references
@@ -92,24 +134,7 @@ def resolve_packages(packages):
     Returns a dictionary of resolved packages.
     '''
     pd = dict([(p.identifier, p) for p in packages])
-    resolved_pd = {
-        'std_logic_1164': Package(
-            identifier='std_logic_1164', constants={}, types={
-                'std_logic_vector': typs.StdLogicVector(),
-                'std_logic': typs.std_logic,
-                }, uses={}),
-        'numeric_std': Package(
-            identifier='numeric_std', constants={}, types={
-                'unsigned': typs.Unsigned(),
-                'signed': typs.Signed(),
-                }, uses={}),
-        'math_real': Package(
-            identifier='math_real', constants={}, types={
-                }, uses={}),
-        'textio': Package(
-            identifier='textio', constants={}, types={
-                }, uses={}),
-        }
+    resolved_pd = BUILTIN_PACKAGES
     resolved_package_names = list(standard_packages)
     toresolve_package_names = [p.identifier for p in packages]
     while toresolve_package_names:
@@ -309,23 +334,3 @@ class UnresolvedPackage:
         return p
 
 
-class Package(object):
-    '''
-    A package defines all the types, constants and dependencies of that package.
-    The dependencies of the types and constants on other packages have
-    been resolved.
-    '''
-
-    resolved = True
-
-    def __init__(self, identifier, types, constants, uses):
-        self.identifier = identifier
-        self.types = types
-        self.constants = constants
-        self.uses = uses
-
-    def __str__(self):
-        return 'Package({})'.format(self.identifier)
-
-    def __repr__(self):
-        return str(self)

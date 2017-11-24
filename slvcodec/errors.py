@@ -1,0 +1,3 @@
+class ResolutionError(Exception):
+    pass
+

@@ -20,6 +20,10 @@ from vunit.parsing.encodings import HDL_FILE_ENCODING
 LOGGER = logging.getLogger(__name__)
 
 
+class VHDLSyntaxError(Exception):
+    pass
+
+
 class VHDLParser(object):
     """
     Parse a single VHDL file, caching the result to a database if available
@@ -352,8 +356,13 @@ class VHDLEntity(object):
             """, re_flags)
         identifier = entity_start.match(code).group('id')
         # Find generics and ports
-        generics = cls._find_generic_clause(code)
-        ports = cls._find_port_clause(code)
+        try:
+            generics = cls._find_generic_clause(code)
+            ports = cls._find_port_clause(code)
+        except VHDLSyntaxError as e:
+            msg  = e.args[0]
+            new_msg = 'Entity {}: {}'.format(identifier, msg)
+            raise VHDLSyntaxError(new_msg)
 
         return cls(identifier, generics, ports)
 
@@ -478,6 +487,9 @@ class VHDLEntity(object):
 
         # Split the interface elements
         interface_elements = port_list_string.split(';')
+
+        if interface_elements[-1].isspace():
+            raise VHDLSyntaxError('Final port ends in a semicolon.')
 
         port_list = []
         # Add interface elements to the port list
