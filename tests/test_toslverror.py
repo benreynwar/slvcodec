@@ -32,6 +32,7 @@ entity SimplePorts is
     i_valid: in std_logic;
     i_data: in array_of_data_t(5 downto 0);
     i_mixtures: in array_of_mixture_t(1 downto 0);
+    i_sizeddata: in std_logic_vector(SIZE-1 downto 0);
     o_valid: out std_logic;
     o_data: out array_of_data_t(5 downto 0)
   );
@@ -45,7 +46,7 @@ end architecture;
 '''
 
 
-def test_ports():
+def test_toslverrors():
     parsed_package = VHDLDesignFile.parse(SIMPLE_PACKAGE)
     processed_package = package.process_parsed_package(parsed_package)
     resolved_package = processed_package.resolve(package.BUILTIN_PACKAGES)
@@ -96,14 +97,6 @@ def test_ports():
     assert all([s in message for s in (
         'simpleports', 'i_mixtures', 'mixture_t', 'color', '16', '15')])
     
-    
-    
-
-
-def fish():
-    typ = ConstrainedStdLogicVector(identifer='a_vector', size=4)
-    
 
 if __name__ == '__main__':
-    test_ports()
-
+    test_toslverrors()
