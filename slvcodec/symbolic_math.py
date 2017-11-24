@@ -13,6 +13,10 @@ from io import StringIO
 logger = logging.getLogger(__name__)
 
 
+class SymbolicMathError(Exception):
+    pass
+
+
 def logceil(argument):
     '''
     Returns the number of bits necessary to represent an integer that has
@@ -98,7 +102,7 @@ def str_expression(item):
     elif hasattr(item, 'str_expression'):
         o = item.str_expression()
     else:
-        raise Exception('Cannot use str_expression on {}'.format(item))
+        raise SymbolicMathError('Cannot use str_expression on {}'.format(item))
     return o
 
 
@@ -228,7 +232,7 @@ class Expression(ExpressionBase):
         return collected
 
     def value(self):
-        raise Exception('Cannot get value of a unparsed expression.')
+        raise SymbolicMathError('Cannot get value of a unparsed expression.')
 
     def str_expression(self):
         return ' '.join([str_expression(item) for item in self.items])
@@ -274,7 +278,7 @@ class Expression(ExpressionBase):
                     new_expression.append(sub_expression)
                     stack = []
                 elif open_braces == 0:
-                    raise Exception('More closing than opening braces')
+                    raise SymbolicMathError('More closing than opening braces')
                 else:
                     stack.append(item)
                 open_braces -= 1
@@ -283,7 +287,7 @@ class Expression(ExpressionBase):
             else:
                 new_expression.append(parse_parentheses(item))
         if open_braces > 0:
-            raise Exception('All braces not closed.')
+            raise SymbolicMathError('All braces not closed.')
         return Expression(new_expression)
 
     @staticmethod
@@ -370,7 +374,7 @@ class Unknown(object):
         return []
 
     def value(self):
-        raise Exception('Cannot get value of Unknown.')
+        raise SymbolicMathError('Cannot get value of Unknown.')
 
 
 FunctionBase = namedtuple('FunctionBase', ['name', 'argument'])
@@ -400,7 +404,7 @@ class Function(FunctionBase):
         elif self.name in ('pow2',):
             v = pow(2, argument)
         else:
-            raise Exception('Unknown function {}'.format(self.name))
+            raise SymbolicMathError('Unknown function {}'.format(self.name))
         return v
 
     def simplify(self):
@@ -641,7 +645,7 @@ class Addition(AdditionBase):
                     sign = -1 * sign
             else:
                 if sign is None:
-                    raise Exception('Unknown sign')
+                    raise SymbolicMathError('Unknown sign')
                 numbers.append(sign)
                 expressions.append(e)
                 sign = None
@@ -714,6 +718,8 @@ def parse(item):
     '''
     Parsed a tokenized string.
     '''
+    if '**' in item.items:
+        raise SymbolicMathError('symbolic math cannot parse power "**" syntax')
     parsed_integers = parse_integers(item)
     parsed_parentheses = parse_parentheses(parsed_integers)
     parsed_functions = parse_functions(parsed_parentheses)

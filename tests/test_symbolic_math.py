@@ -1,3 +1,5 @@
+import pytest
+
 from slvcodec import symbolic_math as sm
 
 
@@ -47,3 +49,11 @@ def test_simplifications():
         simplified = sm.parse_and_simplify(in_string)
         out_string = sm.str_expression(simplified)
         assert out_string in expected_strings
+
+
+def test_fails_on_power():
+    string = '2 ** 6'
+    with pytest.raises(sm.SymbolicMathError) as e:
+        simplified = sm.parse_and_simplify(string)
+    message = e.value.args[0]
+    assert all([s in message for s in ('**', 'power')])
