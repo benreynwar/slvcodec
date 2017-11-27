@@ -24,4 +24,4 @@ before_script:
   - cd ../../
   - export PATH=$PATH:`pwd`/install-ghdl-llvm/bin/
 
-script: pytest tests
+script: pytest --doctest-modules tests slvcodec

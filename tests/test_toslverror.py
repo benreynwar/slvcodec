@@ -32,7 +32,6 @@ entity SimplePorts is
     i_valid: in std_logic;
     i_data: in array_of_data_t(5 downto 0);
     i_mixtures: in array_of_mixture_t(1 downto 0);
-    i_sizeddata: in std_logic_vector(SIZE-1 downto 0);
     o_valid: out std_logic;
     o_data: out array_of_data_t(5 downto 0)
   );
