@@ -299,7 +299,8 @@ class UnresolvedConstrainedStdLogicVector(StdLogicVector):
 
     def resolve(self, types, constants):
         size = resolve_expression(self.size, constants)
-        resolved =  ConstrainedStdLogicVector(identifier=self.identifier, size=size)
+        resolved = ConstrainedStdLogicVector(
+            identifier=self.identifier, size=size)
         return resolved
 
 
@@ -334,9 +335,13 @@ class ConstrainedStdLogicVector:
         else:
             min_value = 0
             max_value = pow(2, size)-1
-            if (data < min_value) or (data > max_value):
-                raise ToSlvError('Value of {} received for type {}.  Should be in range {} to {}'.format(
-                    data, self.identifier, min_value, max_value))
+            try:
+                if (data < min_value) or (data > max_value):
+                    raise ToSlvError('Value of {} received for type {}.  Should be in range {} to {}'.format(
+                        data, self.identifier, min_value, max_value))
+            except TypeError:
+                msg = 'Type of data is {}, but we expected a natural integer'.format(type(data))
+                raise ToSlvError(msg)
             bits = []
             for i in range(size):
                 bits.append(data % 2)
