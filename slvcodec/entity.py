@@ -24,16 +24,18 @@ def process_files(filenames, must_resolve=True):
     for filename in filenames:
         parsed = package.parsed_from_filename(filename)
         if parsed.entities:
-            assert(len(parsed.entities) == 1)
+            assert len(parsed.entities) == 1
             p = process_parsed_entity(parsed)
             entities[p.identifier] = p
-            assert(not parsed.packages)
+            assert not parsed.packages
         if parsed.packages:
             pkg = package.process_parsed_package(parsed)
             packages.append(pkg)
     resolved_packages = package.resolve_packages(packages)
-    resolved_entities = dict([(e.identifier, e.resolve(resolved_packages, must_resolve=must_resolve))
-                             for e in entities.values()])
+    resolved_entities = dict(
+        [(e.identifier,
+          e.resolve(resolved_packages, must_resolve=must_resolve))
+         for e in entities.values()])
     return resolved_entities, resolved_packages
 
 
@@ -69,7 +71,7 @@ class Port:
 
     def __init__(self, name, direction, typ):
         self.name = name
-        if direction == None:
+        if direction is None:
             # Default direction is 'in'.
             direction = 'in'
         self.direction = direction
@@ -89,7 +91,8 @@ class UnresolvedEntity:
         self.uses = uses
 
     def resolve(self, packages, must_resolve=True):
-        resolved_uses = package.resolve_uses(self.uses, packages, must_resolve=must_resolve)
+        resolved_uses = package.resolve_uses(
+            self.uses, packages, must_resolve=must_resolve)
         available_types, available_constants = package.combine_packages(
             [u.package for u in resolved_uses.values()])
         available_constants = package.exclusive_dict_merge(
@@ -146,7 +149,7 @@ class Entity(object):
         return str(self)
 
     def input_ports(self):
-        input_ports = dict([
+        input_ports = collections.OrderedDict([
             (port_name, port) for port_name, port in self.ports.items()
             if (port.direction == 'in') and (port.name not in CLOCK_NAMES)])
         return input_ports
@@ -156,7 +159,7 @@ class Entity(object):
         Takes a dictionary of inputs, and a dictionary of generics parameters for the entity
         and produces a string of '0's and '1's representing the input values.
         '''
-        slvs = [] 
+        slvs = []
         for port in self.input_ports().values():
             d = inputs.get(port.name, None)
             try:
