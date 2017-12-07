@@ -3,7 +3,6 @@ Functions to generate packages from existing packages that define types to
 convert the types back and forth to std_logic_vector.
 '''
 
-
 import os
 import logging
 
@@ -86,14 +85,15 @@ def make_array_declarations_and_definitions(array_type):
                 array_type.unconstrained_type.subtype.width)
             unconstrained = False
         else:
-            # We don't need to define functions because it's not a new kind of array
-            # it's just constraining an existing one.
+            # We don't need to define functions because it's not a new kind of
+            # array it's just constraining an existing one.
             subtype_width = None
     else:
         width_declaration = ''
         unconstrained = True
         if array_type.subtype.identifier is None:
-            subtype_width = symbolic_math.str_expression(array_type.subtype.width)
+            subtype_width = symbolic_math.str_expression(
+                array_type.subtype.width)
         else:
             subtype_width = array_type.subtype.identifier + '_slvcodecwidth'
 
@@ -103,11 +103,13 @@ def make_array_declarations_and_definitions(array_type):
         declarations = width_declaration
         definitions = ''
     else:
-        functions_declarations = functions_declarations_template.format(type=array_type)
+        functions_declarations = functions_declarations_template.format(
+            type=array_type)
         declarations = '\n'.join([width_declaration, functions_declarations])
-        template_fn = os.path.join(os.path.dirname(__file__), 'templates', 'slvcodec_array_template.vhd')
-        with open(template_fn, 'r') as f:
-            definitions_template = jinja2.Template(f.read())
+        template_fn = os.path.join(os.path.dirname(__file__), 'templates',
+                                   'slvcodec_array_template.vhd')
+        with open(template_fn, 'r') as template_file:
+            definitions_template = jinja2.Template(template_file.read())
         definitions = definitions_template.render(
             type=array_type.identifier,
             subtype_width=subtype_width,
@@ -124,14 +126,15 @@ def make_declarations_and_definitions(typ):
     if type(typ) in (typs.Array, typs.ConstrainedArray,
                      typs.ConstrainedStdLogicVector, typs.ConstrainedUnsigned,
                      typs.ConstrainedSigned):
-        return make_array_declarations_and_definitions(typ)
+        d_and_d = make_array_declarations_and_definitions(typ)
     elif isinstance(typ, typs.Record):
-        return make_record_declarations_and_definitions(typ)
+        d_and_d = make_record_declarations_and_definitions(typ)
     elif isinstance(typ, typs.Enumeration):
-        return make_enumeration_declarations_and_definitions(typ)
+        d_and_d = make_enumeration_declarations_and_definitions(typ)
     else:
         logger.warning('Dont know how to slvcodec functions for {}.'.format(typ))
-        return '', ''
+        d_and_d = '', ''
+    return d_and_d
 
 
 def make_slvcodec_package(pkg):

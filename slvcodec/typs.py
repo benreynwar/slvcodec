@@ -512,11 +512,11 @@ class Record:
         for name, subtype in self.names_and_subtypes:
             try:
                 slvs.append(subtype.to_slv(data.get(name, None), generics))
-            except ToSlvError as e:
-                message = e.args[0]
+            except ToSlvError as error:
+                message = error.args[0]
                 new_message = 'Error in element {} in record of type {}.'.format(
                     name, self.identifier) + '  ' + message
-                raise ToSlvError(new_message) from e
+                raise ToSlvError(new_message) from error
         slv = ''.join(reversed(slvs))
         return slv
 
@@ -529,7 +529,7 @@ class Record:
 
     def from_slv(self, slv, generics):
         data, reduced_slv = self.reduce_slv(slv, generics)
-        assert(reduced_slv == '')
+        assert reduced_slv == ''
         return data
 
     def declaration(self):
