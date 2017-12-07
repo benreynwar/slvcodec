@@ -489,7 +489,7 @@ class Expression(ExpressionBase):
 
 
 UnknownBase = namedtuple('UnknownBase', ['items'])
-class Unknown(object):
+class Unknown(UnknownBase):
     '''
     A dummy object into which we can throw things we fail to parse without
     everything crashing and burning.
