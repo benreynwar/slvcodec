@@ -1,3 +1,9 @@
+'''
+This module contains functions for converting to and from different
+representations of signed and unsigned numbers.
+'''
+
+
 def list_of_uints_to_uint(list_of_uints, width):
     '''
     Convert a list of unsigned integers into a single unsigned integer.
