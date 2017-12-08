@@ -4,6 +4,7 @@ Useful for parsing VHDL.
 '''
 
 import tokenize
+import collections
 import logging
 import math
 from collections import namedtuple
@@ -636,7 +637,7 @@ class Multiplication(MultiplicationBase):
         >>> Multiplication((Power(3, 2), Power(-1, 10))).simplify()
         0.8
         '''
-        new_powers = {}
+        new_powers = collections.OrderedDict()
         powers = [transform(item, simplify) for item in self.powers]
         pure = 1
         for power in powers:
@@ -846,7 +847,7 @@ class Addition(AdditionBase):
                 new_term = term
                 expanded_terms.append(new_term)
         numbers_and_expressions = [(t.number, t.expression) for t in expanded_terms]
-        d = {}
+        d = collections.OrderedDict()
         int_part = 0
         for n, e in numbers_and_expressions:
             if is_number(e):
@@ -857,7 +858,8 @@ class Addition(AdditionBase):
                 else:
                     d[e] += n
         d[int_part] = 1
-        cleaned_d = dict([(k, v) for k, v in d.items() if (v != 0) and (k != 0)])
+        cleaned_d = collections.OrderedDict(
+            [(k, v) for k, v in d.items() if (v != 0) and (k != 0)])
         new_expressions = list(cleaned_d.keys())
         new_numbers = [cleaned_d[k] for k in new_expressions]
         if len(new_expressions) == 1:
