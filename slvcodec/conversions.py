@@ -11,6 +11,15 @@ def list_of_uints_to_uint(list_of_uints, width):
     Args:
         `list_of_uints`: The list of integers.
         `width`: The width of each individual integer.
+
+    >>> # Check that first is the least significant.
+    >>> list_of_uints_to_uint(list_of_uints=[1, 0, 0], width=1)
+    1
+    >>> list_of_uints_to_uint(list_of_uints=[0, 0, 1], width=1)
+    4
+    >>> # Check for width of 2.
+    >>> list_of_uints_to_uint(list_of_uints=[3, 2, 1], width=2)
+    27
     '''
     if None in list_of_uints:
         output = None
@@ -33,6 +42,11 @@ def uint_to_list_of_uints(uint, size, width):
         `uint`: the input unsigned integer
         `width`: The width of each individual unsigned integer.
         `size`: The number of items in the produced list.
+
+    >>> uint_to_list_of_uints(5, size=4, width=1)
+    [1, 0, 1, 0]
+    >>> uint_to_list_of_uints(27, size=3, width=2)
+    [3, 2, 1]
     '''
     if uint is None:
         output = None
@@ -50,6 +64,11 @@ def uint_to_list_of_uints(uint, size, width):
 def sint_to_uint(sint, width):
     '''
     Convert a signed integer to an unsigned integer.
+
+    >>> sint_to_uint(-1, width=2)
+    3
+    >>> sint_to_uint(-2, width=3)
+    6
     '''
     if sint is None:
         uint = None
@@ -63,6 +82,11 @@ def sint_to_uint(sint, width):
 def uint_to_sint(uint, width):
     '''
     Convert an unsigned integer to a signed integer.
+
+    >>> uint_to_sint(3,  width=2)
+    -1
+    >>> uint_to_sint(3, width=3)
+    3
     '''
     if uint is None:
         sint = None
@@ -76,6 +100,11 @@ def uint_to_sint(uint, width):
 def list_of_sints_to_uint(list_of_sints, width):
     '''
     Convert a list of signed integers to an unsigned integer.
+
+    >>> list_of_sints_to_uint(list_of_sints=[-1, 0, 0], width=2)
+    3
+    >>> list_of_sints_to_uint(list_of_sints=[0, 0, -1], width=2)
+    48
     '''
     if None in list_of_sints:
         uint = None
@@ -88,6 +117,9 @@ def list_of_sints_to_uint(list_of_sints, width):
 def uint_to_list_of_sints(uint, size, width):
     '''
     Convert an unsigned integer to a list of signed integers.
+
+    >>> uint_to_list_of_sints(48, size=3, width=2)
+    [0, 0, -1]
     '''
     if uint is None:
         list_of_sints = None
@@ -100,6 +132,11 @@ def uint_to_list_of_sints(uint, size, width):
 def slv_to_uint(slv):
     '''
     Convert a string of '0' and '1' to an unsigned integer.
+
+    >>> slv_to_uint('001')
+    1
+    >>> slv_to_uint('1010')
+    10
     '''
     total = 0
     f = 1
@@ -116,6 +153,11 @@ def slv_to_uint(slv):
 def uint_to_slv(uint, width):
     '''
     Convert an unsigned integer to a string of '0' and '1'.
+
+    >>> uint_to_slv(10, width=6)
+    '001010'
+    >>> uint_to_slv(3, width=3)
+    '011'
     '''
     if uint is None:
         slv = 'U' * width
