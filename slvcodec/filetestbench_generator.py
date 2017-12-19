@@ -3,7 +3,7 @@ import os
 
 import jinja2
 
-from slvcodec import entity, package, typs, package_generator, config
+from slvcodec import entity, package, typs, package_generator, config, top_parser
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ def prepare_files(directory, filenames, top_entity):
     Returns a tuple of a list of testbench files, and a dictionary
     of parsed objects.
     '''
-    entities, packages = entity.process_files(filenames)
+    entities, packages = top_parser.process_files(filenames)
     resolved_entity = entities[top_entity]
     new_fns = [
         os.path.join(config.vhdldir, 'read_file.vhd'),
@@ -106,11 +106,11 @@ def add_slvcodec_files(directory, filenames):
     Parses files, and generates helper packages for existing packages that
     contain functions to convert types to and from std_logic_vector.
     '''
-    entities, packages = entity.process_files(filenames, must_resolve=False)
+    entities, packages = top_parser.process_files(filenames, must_resolve=False)
     combined_filenames = [os.path.join(config.vhdldir, 'txt_util.vhd'),
                           os.path.join(config.vhdldir, 'slvcodec.vhd')]
     for fn in filenames:
-        parsed = package.parsed_from_filename(fn)
+        parsed = top_parser.parsed_from_filename(fn)
         if fn not in combined_filenames:
             combined_filenames.append(fn)
         if parsed.packages and fn[-len('slvcodec.vhd'):] != 'slvcodec.vhd':

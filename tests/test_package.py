@@ -1,19 +1,19 @@
 import logging
 import os
 
-from slvcodec import package, config
+from slvcodec import package, config, top_parser
 
 vhdl_dir = os.path.join(os.path.dirname(__file__),  'vhdl')
 
 
 def test_dummy_width():
     package_filenames = [os.path.join(vhdl_dir, 'vhdl_type_pkg.vhd')]
-    packages = package.parse_process_and_resolve_packages(package_filenames)
+    entities, packages = top_parser.process_files(package_filenames)
     p = packages['vhdl_type_pkg']
     t = p.types['t_dummy']
-    assert(t.width.value() == 23)
+    assert t.width.value() == 23
     aau = p.types['array_of_array_of_unsigned']
-    assert(aau.width.value() == 6*6*4)
+    assert aau.width.value() == 6*6*4
 
 
 if __name__ == '__main__':
