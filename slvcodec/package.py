@@ -8,47 +8,15 @@ logger = logging.getLogger(__name__)
 STANDARD_PACKAGES = ('std_logic_1164', 'numeric_std', 'math_real', 'textio')
 
 
-def get_types(parsed_package):
+class Use:
     '''
-    Get a list of all types defined in the parsed package.
+    Defines a package dependency for a package or entity.
     '''
-    types = (
-        parsed_package.enumeration_types +
-        parsed_package.record_types +
-        parsed_package.array_types +
-        parsed_package.subtypes
-    )
-    return types
-
-
-def process_parsed_package(parsed_package):
-    '''
-    Process a parsed package (from vhdl_parser) into an UnresolvedPackage object.
-    '''
-    p_constants = parsed_package.packages[0].constants
-    p_types = get_types(parsed_package.packages[0])
-    constants = {}
-    for constant in p_constants:
-        if constant.text == '':
-            # This typically happens when a parameters file has been generated
-            # incorrectly.
-            raise Exception('Constant {} has no value to parse'.format(constant.identifier))
-        constants[constant.identifier] = symbolic_math.parse_and_simplify(constant.text)
-    processed_types = [(t.identifier, typ_parser.process_parsed_type(t))
-                        for t in p_types]
-    # Filter out the types that could not be processed.
-    types = dict([(k, v) for k, v in processed_types if v is not None])
-    failed_type_keys = [k for k, v in processed_types if v is None]
-    if failed_type_keys:
-        logger.warning('Failed to parse types %s', str(failed_type_keys))
-    uses = dependencies.get_parsed_dependencies(parsed_package)
-    processed_package = UnresolvedPackage(
-        identifier=parsed_package.packages[0].identifier,
-        types=types,
-        constants=constants,
-        uses=uses,
-    )
-    return processed_package
+    def __init__(self, library, design_unit, name_within, package=None):
+        self.library = library
+        self.design_unit = design_unit
+        self.name_within = name_within
+        self.package = package
 
 
 class Package(object):
@@ -162,7 +130,7 @@ def resolve_uses(uses, packages, must_resolve=True):
             if must_resolve:
                 raise Exception('Dependency package {} is not resolved'.format(use_name))
         else:
-            resolved_uses[use_name] = dependencies.Use(
+            resolved_uses[use_name] = Use(
                 library=use.library,
                 design_unit=use.design_unit,
                 name_within=use.name_within,

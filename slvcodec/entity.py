@@ -11,34 +11,6 @@ logger = logging.getLogger(__name__)
 CLOCK_NAMES = ('clk', 'clock')
 
 
-def process_parsed_entity(parsed_entity):
-    '''
-    Processes the parse entity (output from VUnit vhdl_parser)
-    into an UnresolvedEntity class.
-    '''
-    p_generics = parsed_entity.entities[0].generics
-    generics = [typs.Generic(
-        name=g.identifier,
-        typ=typ_parser.process_subtype_indication(g.subtype_indication),
-        ) for g in p_generics]
-    p_ports = parsed_entity.entities[0].ports
-    ports = [Port(
-        name=p.identifier,
-        direction=p.mode,
-        typ=typ_parser.process_subtype_indication(p.subtype_indication),
-        ) for p in p_ports]
-    generics_dict = dict([(g.name, g) for g in generics])
-    ports_dict = collections.OrderedDict([(p.name, p) for p in ports])
-    uses = dependencies.get_parsed_dependencies(parsed_entity)
-    processed_entity = UnresolvedEntity(
-        identifier=parsed_entity.entities[0].identifier,
-        generics=generics_dict,
-        ports=ports_dict,
-        uses=uses,
-    )
-    return processed_entity
-
-
 class Port:
 
     def __init__(self, name, direction, typ):

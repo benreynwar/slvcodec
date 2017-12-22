@@ -3,7 +3,7 @@ import os
 
 import jinja2
 
-from slvcodec import entity, package, typs, package_generator, config, top_parser
+from slvcodec import entity, package, typs, package_generator, config, vhdl_parser
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ def prepare_files(directory, filenames, top_entity):
     Returns a tuple of a list of testbench files, and a dictionary
     of parsed objects.
     '''
-    entities, packages = top_parser.process_files(filenames)
+    entities, packages = vhdl_parser.parse_and_resolve_files(filenames)
     resolved_entity = entities[top_entity]
     new_fns = [
         os.path.join(config.vhdldir, 'read_file.vhd'),
@@ -106,15 +106,23 @@ def add_slvcodec_files(directory, filenames):
     Parses files, and generates helper packages for existing packages that
     contain functions to convert types to and from std_logic_vector.
     '''
-    entities, packages = top_parser.process_files(filenames, must_resolve=False)
+    parsed_packages = []
+    filename_to_package_name = {}
+    for filename in filenames:
+        new_parsed_entities, new_parsed_packages = vhdl_parser.parse_file(filename)
+        parsed_packages += new_parsed_packages
+        if new_parsed_packages:
+            assert len(new_parsed_packages) == 1
+            filename_to_package_name[filename] = new_parsed_packages[0].identifier
+    entities, packages = vhdl_parser.resolve_entities_and_packages(
+        entities=[], packages=parsed_packages)
     combined_filenames = [os.path.join(config.vhdldir, 'txt_util.vhd'),
                           os.path.join(config.vhdldir, 'slvcodec.vhd')]
     for fn in filenames:
-        parsed = top_parser.parsed_from_filename(fn)
         if fn not in combined_filenames:
             combined_filenames.append(fn)
-        if parsed.packages and fn[-len('slvcodec.vhd'):] != 'slvcodec.vhd':
-            package_name = parsed.packages[0].identifier
+        if (fn in filename_to_package_name) and (fn[-len('slvcodec.vhd'):] != 'slvcodec.vhd'):
+            package_name = filename_to_package_name[fn]
             slvcodec_pkg = package_generator.make_slvcodec_package(packages[package_name])
             slvcodec_package_filename = os.path.join(
                 directory, '{}_slvcodec.vhd'.format(package_name))

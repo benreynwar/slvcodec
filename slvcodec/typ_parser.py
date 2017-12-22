@@ -1,20 +1,23 @@
 import re
 import logging
 
-from slvcodec import symbolic_math, typs,  vhdl_parser
+from slvcodec import symbolic_math, typs, inner_vhdl_parser
 
 
 logger = logging.getLogger(__name__)
 
 
 def process_parsed_type(typ):
-    if isinstance(typ, vhdl_parser.VHDLSubtype):
+    '''
+    Processes a type object produced by the vhdl_parser module.
+    '''
+    if isinstance(typ, inner_vhdl_parser.VHDLSubtype):
         success = process_subtype(typ)
-    elif isinstance(typ, vhdl_parser.VHDLArrayType):
+    elif isinstance(typ, inner_vhdl_parser.VHDLArrayType):
         success = process_array_type(typ)
-    elif isinstance(typ, vhdl_parser.VHDLRecordType):
+    elif isinstance(typ, inner_vhdl_parser.VHDLRecordType):
         success = process_record_type(typ)
-    elif isinstance(typ, vhdl_parser.VHDLEnumerationType):
+    elif isinstance(typ, inner_vhdl_parser.VHDLEnumerationType):
         success = process_enumeration_type(typ)
     else:
         raise Exception('Unknown type {}'.format(typ))
