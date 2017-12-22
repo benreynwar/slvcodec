@@ -3,7 +3,7 @@ import os
 import random
 
 from slvcodec import filetestbench_generator
-from slvcodec import entity, package, typs, config, top_parser
+from slvcodec import entity, package, typs, config, vhdl_parser
 
 vhdl_dir = os.path.join(os.path.dirname(__file__),  'vhdl')
 
@@ -14,7 +14,7 @@ def test_dummy_width():
     # Parse and process entity
     entity_filename = os.path.join(vhdl_dir, 'dummy.vhd')
     package_filenames = [os.path.join(vhdl_dir, 'vhdl_type_pkg.vhd')]
-    entities, packages = top_parser.process_files([entity_filename] + package_filenames)
+    entities, packages = vhdl_parser.parse_and_resolve_files([entity_filename] + package_filenames)
     # Resolve the entity with the constants and types defined in the package.
     resolved_entity = entities['dummy']
     # And get the ports from the resolved entity.

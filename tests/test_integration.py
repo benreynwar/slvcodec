@@ -60,7 +60,7 @@ def test_vunit_simple_integration():
     filenames = [entity_filename] + package_filenames
     generation_directory = os.path.join(thistestoutput_dir, 'generated')
     os.makedirs(generation_directory)
-    vu = config.setup_vunit(argv=[])
+    vu = config.setup_vunit(argv=['--dont-catch-exceptions'])
     test_utils.register_test_with_vunit(
         vu=vu,
         directory=generation_directory,
@@ -89,7 +89,7 @@ def test_vunit_coretest_integration():
         'generator': DummyChecker,
         }
     config.setup_fusesoc(cores_roots=[coresdir])
-    vu = config.setup_vunit(argv=[])
+    vu = config.setup_vunit(argv=['--dont-catch-exceptions'])
     test_utils.register_coretest_with_vunit(vu, coretest, thistestoutput_dir)
     all_ok = vu._main()
     assert all_ok
