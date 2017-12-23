@@ -1,7 +1,7 @@
 import collections
 import logging
 
-from slvcodec import package, dependencies, typ_parser, symbolic_math, typs, errors
+from slvcodec import package, dependencies, typ_parser, math_parser, typs, errors
 
 
 logger = logging.getLogger(__name__)
@@ -161,7 +161,7 @@ class Entity(object):
         for port in self.ports.values():
             if (port.direction == direction) and (port.name not in CLOCK_NAMES):
                 width_symbol = typs.make_substitute_generics_function(generics)(port.typ.width)
-                width = symbolic_math.get_value(width_symbol)
+                width = math_parser.get_value(width_symbol)
                 intwidth = int(width)
                 assert width == intwidth
                 if pos == 0:

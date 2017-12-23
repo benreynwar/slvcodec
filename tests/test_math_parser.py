@@ -1,6 +1,6 @@
 import pytest
 
-from slvcodec import symbolic_math as sm
+from slvcodec import math_parser as sm
 
 
 def test_substitute():

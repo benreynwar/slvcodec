@@ -8,7 +8,7 @@ import logging
 
 import jinja2
 
-from slvcodec import typs, symbolic_math
+from slvcodec import typs, math_parser
 
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ def make_record_declarations_and_definitions(record_type):
     '''
     declarations = declarations_template.format(
         type=record_type,
-        width_expression=symbolic_math.str_expression(record_type.width),
+        width_expression=math_parser.str_expression(record_type.width),
         )
     template_fn = os.path.join(os.path.dirname(__file__), 'templates',
                                'slvcodec_record_template.vhd')
@@ -41,7 +41,7 @@ def make_record_declarations_and_definitions(record_type):
     for index, name_and_subtype in enumerate(record_type.names_and_subtypes):
         name, subtype = name_and_subtype
         indices_names_and_widths.append(
-            (index, name, symbolic_math.str_expression(subtype.width)))
+            (index, name, math_parser.str_expression(subtype.width)))
     definitions = definitions_template.render(
         type=record_type.identifier,
         indices_names_and_widths=indices_names_and_widths)
@@ -55,7 +55,7 @@ def make_enumeration_declarations_and_definitions(enumeration_type):
     '''
     declarations = declarations_template.format(
         type=enumeration_type,
-        width_expression=symbolic_math.str_expression(enumeration_type.width),
+        width_expression=math_parser.str_expression(enumeration_type.width),
         )
     template_fn = os.path.join(os.path.dirname(__file__), 'templates',
                                'slvcodec_enumeration_template.vhd')
@@ -75,13 +75,13 @@ def make_array_declarations_and_definitions(array_type):
     array types.
     '''
     if hasattr(array_type, 'size'):
-        width_expression = symbolic_math.str_expression(array_type.width)
+        width_expression = math_parser.str_expression(array_type.width)
         width_declaration = width_declarations_template.format(
             type=array_type,
             width_expression=width_expression,
             )
         if array_type.unconstrained_type.identifier is None:
-            subtype_width = symbolic_math.str_expression(
+            subtype_width = math_parser.str_expression(
                 array_type.unconstrained_type.subtype.width)
             unconstrained = False
         else:
@@ -92,7 +92,7 @@ def make_array_declarations_and_definitions(array_type):
         width_declaration = ''
         unconstrained = True
         if array_type.subtype.identifier is None:
-            subtype_width = symbolic_math.str_expression(
+            subtype_width = math_parser.str_expression(
                 array_type.subtype.width)
         else:
             subtype_width = array_type.subtype.identifier + '_slvcodecwidth'

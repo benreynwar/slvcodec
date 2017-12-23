@@ -1,6 +1,6 @@
 import logging
 
-from slvcodec import symbolic_math, typs, typ_parser, dependencies
+from slvcodec import math_parser, typs, typ_parser, dependencies
 
 
 logger = logging.getLogger(__name__)
@@ -158,13 +158,13 @@ class UnresolvedPackage:
             [u.package for u in resolved_uses.values()])
 
         def resolve_constant(name, constant, resolved_constants):
-            resolved = symbolic_math.make_substitute_function(
+            resolved = math_parser.make_substitute_function(
                 resolved_constants)(constant)
             resolved_constant = typs.Constant(name=name, expression=resolved)
             return resolved_constant
 
         constant_dependencies = dict([
-            (name, symbolic_math.get_constant_list(c))
+            (name, math_parser.get_constant_list(c))
             for name, c in self.constants.items()])
         resolved_constants, failed_constants = dependencies.resolve_dependencies(
             available=available_constants,

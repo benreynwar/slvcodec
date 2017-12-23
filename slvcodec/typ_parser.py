@@ -1,7 +1,7 @@
 import re
 import logging
 
-from slvcodec import symbolic_math, typs, inner_vhdl_parser
+from slvcodec import math_parser, typs, inner_vhdl_parser
 
 
 logger = logging.getLogger(__name__)
@@ -31,8 +31,8 @@ def get_size(typ):
     if (lower_expression is None) and (upper_expression is None):
         size = None
     else:
-        size = symbolic_math.simplify(symbolic_math.Addition([
-            symbolic_math.Term(number=n, expression=e) for n, e in
+        size = math_parser.simplify(math_parser.Addition([
+            math_parser.Term(number=n, expression=e) for n, e in
             ((1, upper_expression), (1, 1), (-1, lower_expression))]))
     return size
 
@@ -57,8 +57,8 @@ def get_bounds(type_range):
         upper_expression = None
         lower_expression = None
     else:
-        upper_expression = symbolic_math.parse_and_simplify(upper)
-        lower_expression = symbolic_math.parse_and_simplify(lower)
+        upper_expression = math_parser.parse_and_simplify(upper)
+        lower_expression = math_parser.parse_and_simplify(lower)
     return lower_expression, upper_expression
 
 
@@ -78,10 +78,10 @@ def get_constraint_bounds(constraint):
         elif gd['direction'] == 'downto':
             high = gd['range_left']
             low = gd['range_right']
-        high_expr = symbolic_math.parse_and_simplify(high)
-        low_expr = symbolic_math.parse_and_simplify(low)
+        high_expr = math_parser.parse_and_simplify(high)
+        low_expr = math_parser.parse_and_simplify(low)
         size_as_string = '{} + 1 - {}'.format(high, low)
-        size = symbolic_math.parse_and_simplify(size_as_string)
+        size = math_parser.parse_and_simplify(size_as_string)
     else:
         raise Exception('Failed to parse constraint.')
     return high_expr, low_expr
@@ -103,8 +103,8 @@ def get_range_bounds(type_range):
         elif gd['direction'] == 'downto':
             high = gd['range_left']
             low = gd['range_right']
-        high_expr = symbolic_math.parse_and_simplify(high)
-        low_expr = symbolic_math.parse_and_simplify(low)
+        high_expr = math_parser.parse_and_simplify(high)
+        low_expr = math_parser.parse_and_simplify(low)
     else:
         raise Exception('Failed to parse constraint.')
     return low_expr, high_expr
@@ -112,8 +112,8 @@ def get_range_bounds(type_range):
 
 def get_constraint_size(constraint):
     high, low = get_constraint_bounds(constraint)
-    size = symbolic_math.parse_and_simplify('{} + 1 - {}'.format(
-        symbolic_math.str_expression(high), symbolic_math.str_expression(low)))
+    size = math_parser.parse_and_simplify('{} + 1 - {}'.format(
+        math_parser.str_expression(high), math_parser.str_expression(low)))
     return size
 
 

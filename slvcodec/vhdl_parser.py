@@ -2,7 +2,7 @@ import logging
 import collections
 
 from slvcodec import inner_vhdl_parser, package
-from slvcodec import symbolic_math, typ_parser
+from slvcodec import math_parser, typ_parser
 from slvcodec import entity, typs
 
 
@@ -67,7 +67,7 @@ def process_parsed_package(parsed_package, parsed_uses):
             # This typically happens when a parameters file has been generated
             # incorrectly.
             raise Exception('Constant {} has no value to parse'.format(constant.identifier))
-        constants[constant.identifier] = symbolic_math.parse_and_simplify(constant.text)
+        constants[constant.identifier] = math_parser.parse_and_simplify(constant.text)
     processed_types = [(t.identifier, typ_parser.process_parsed_type(t))
                        for t in p_types]
     # Filter out the types that could not be processed.

@@ -1,6 +1,17 @@
+'''
+Representations of unresolved and resolved types.
+
+An unresolved type is a description of a type but contains references to other types
+and constants are strings.
+
+The unresolved type is resolved so that these references are replaced with the
+resolved type and constant objects.
+'''
+
+
 import logging
 
-from slvcodec import symbolic_math, conversions, errors
+from slvcodec import math_parser, conversions, errors
 
 
 logger = logging.getLogger(__name__)
@@ -22,6 +33,10 @@ class Generic:
         self.default = default
 
     def str_expression(self):
+        '''
+        Returns the a string representation of the math object.  In this case the
+        name of the generic parameter.
+        '''
         return self.name
 
 
@@ -34,7 +49,7 @@ def make_substitute_generics_function(d):
         if isinstance(item, Generic):
             o = d.get(item.name, item)
         else:
-            o = symbolic_math.transform(item, substitute)
+            o = math_parser.transform(item, substitute)
         return o
     return substitute
 
@@ -44,7 +59,7 @@ def apply_generics(generics, expression):
     Resolve generic objects in the expression.
     '''
     substituted = make_substitute_generics_function(generics)(expression)
-    value = symbolic_math.get_value(substituted)
+    value = math_parser.get_value(substituted)
     return value
 
 
@@ -58,25 +73,32 @@ class Constant:
         self.expression = expression
 
     def value(self):
-        return symbolic_math.get_value(self.expression)
+        '''
+        Determine the value of this constant.
+        '''
+        return math_parser.get_value(self.expression)
 
     def str_expression(self):
+        '''
+        Returns the a string representation of the math object.  In this case the
+        name of the constant.
+        '''
         return self.name
 
 
-def resolve_expression(e, constants):
+def resolve_expression(expression, constants):
     '''
     Replace all strings in an expression with the appropriate `Constant`
     objects.
     '''
-    constant_dependencies = symbolic_math.get_constant_list(e)
+    constant_dependencies = math_parser.get_constant_list(expression)
     missing_constants = set(constant_dependencies) - set(constants.keys())
     if missing_constants:
         raise errors.ResolutionError('Missing constants {}'.format(missing_constants))
     if constant_dependencies:
-        resolved_e = symbolic_math.make_substitute_function(constants)(e)
+        resolved_e = math_parser.make_substitute_function(constants)(expression)
     else:
-        resolved_e = e
+        resolved_e = expression
     return resolved_e
 
 
@@ -93,9 +115,12 @@ class StdLogic:
         return 'std_logic'
 
     def to_slv(self, data, generics):
+        '''
+        Convert the data into a string on '0's and '1's.
+        '''
         if data not in (0, 1, None):
-            raise ToSlvError('Value received for std_logic is {}.  Allowed values are 0, 1 or None.'.format(
-                data))
+            raise ToSlvError('Value received for std_logic is {}.  '.format(data) +
+                             'Allowed values are 0, 1 or None.')
         if data == 1:
             slv = '1'
         elif data == 0:
@@ -105,6 +130,9 @@ class StdLogic:
         return slv
 
     def from_slv(self, slv, generics):
+        '''
+        Convert a string of '0's and '1's into the data object.
+        '''
         mapping = {
             '0': 0,
             '1': 1,
@@ -113,6 +141,10 @@ class StdLogic:
         return data
 
     def reduce_slv(self, slv, generics):
+        '''
+        Extracts the data object from the end of the given 'slv'.
+        Returns a (data_object, remainder_slv) tuple.
+        '''
         return self.from_slv(slv[-1], generics), slv[:-1]
 
 
@@ -131,8 +163,8 @@ class UnresolvedConstrainedArray:
     def __init__(self, identifier, size, unconstrained_type_identifier=None,
                  unconstrained_type=None):
         self.identifier = identifier
-        assert((unconstrained_type_identifier is None) or (unconstrained_type is None))
-        assert(not ((unconstrained_type_identifier is None) and (unconstrained_type is None)))
+        assert (unconstrained_type_identifier is None) or (unconstrained_type is None)
+        assert not ((unconstrained_type_identifier is None) and (unconstrained_type is None))
         self.unconstrained_type = unconstrained_type
         self.unconstrained_type_identifier = unconstrained_type_identifier
         if unconstrained_type_identifier is not None:
@@ -142,6 +174,11 @@ class UnresolvedConstrainedArray:
         self.size = size
 
     def resolve(self, types, constants):
+        '''
+        Replace references to types and constants to resolved types and constants.
+        `types`: a dictionary of resolved types.
+        `constants`: a dictionary of resolved constants.
+        '''
         if self.unconstrained_type_identifier is not None:
             if self.unconstrained_type_identifier not in types:
                 raise errors.ResolutionError(
@@ -171,14 +208,14 @@ class ConstrainedArray:
         self.identifier = identifier
         self.unconstrained_type = unconstrained_type
         self.size = size
-        self.width = symbolic_math.Multiplication(
-            powers=(symbolic_math.Power(number=1, expression=self.size),
-                    symbolic_math.Power(number=1, expression=self.unconstrained_type.subtype.width),
+        self.width = math_parser.Multiplication(
+            powers=(math_parser.Power(number=1, expression=self.size),
+                    math_parser.Power(number=1, expression=self.unconstrained_type.subtype.width),
                    ))
 
     def __str__(self):
         s = '{}({}-1 downto 0)'.format(
-            self.unconstrained_type.identifier, symbolic_math.str_expression(
+            self.unconstrained_type.identifier, math_parser.str_expression(
                 self.size))
         return s
 
@@ -219,8 +256,8 @@ class UnresolvedArray:
     unconstrained = True
 
     def __init__(self, identifier, subtype_identifier=None, subtype=None):
-        assert((subtype is None) or (subtype_identifier is None))
-        assert((subtype is not None) or (subtype_identifier is not None))
+        assert (subtype is None) or (subtype_identifier is None)
+        assert (subtype is not None) or (subtype_identifier is not None)
         self.identifier = identifier
         self.subtype_identifier = subtype_identifier
         self.subtype = subtype
@@ -323,7 +360,7 @@ class ConstrainedStdLogicVector:
         if self.identifier is None:
             s = '{}({}-1 downto 0)'.format(
                 self.unconstrained_name,
-                symbolic_math.str_expression(self.size))
+                math_parser.str_expression(self.size))
         else:
             s = self.identifier
         return s
@@ -346,7 +383,7 @@ class ConstrainedStdLogicVector:
             for i in range(size):
                 bits.append(data % 2)
                 data = data >> 1
-            assert(data == 0)
+            assert data == 0
             slv = ''.join([std_logic.to_slv(b, generics) for b in reversed(bits)])
         return slv
 
@@ -410,7 +447,7 @@ class ConstrainedSigned(ConstrainedStdLogicVector):
         self.identifier = identifier
         self.size = size
         self.width = size
-        size_value = symbolic_math.get_value(size)
+        size_value = math_parser.get_value(size)
         self.max_value = pow(2, size_value-1)-1
         self.min_value = -pow(2, size_value-1)
 
@@ -433,8 +470,8 @@ class ConstrainedSigned(ConstrainedStdLogicVector):
         if data is not None:
             if data > self.max_value:
                 data -= pow(2, size)
-            assert(data >= self.min_value)
-            assert(data <= self.max_value)
+            assert data >= self.min_value
+            assert data <= self.max_value
         return data
 
 
@@ -447,7 +484,7 @@ def type_width_constant(typ):
     elif isinstance(typ, ConstrainedStdLogicVector):
         width = typ.size
     elif isinstance(typ, ConstrainedArray):
-        width = symbolic_math.Multiplication(
+        width = math_parser.Multiplication(
             [typ.unconstrained_type.identifier, typ.size], [])
     else:
         width = '{}_slvcodecwidth'.format(typ.identifier)
@@ -495,8 +532,8 @@ class Record:
         self.identifier = identifier
         self.names_and_subtypes = names_and_subtypes
         subtype_widths = [subtype.width for name, subtype in names_and_subtypes]
-        self.width = symbolic_math.simplify(symbolic_math.Addition([
-            symbolic_math.Term(number=1, expression=e) for e in subtype_widths]))
+        self.width = math_parser.simplify(math_parser.Addition([
+            math_parser.Term(number=1, expression=e) for e in subtype_widths]))
 
     def __str__(self):
         return self.identifier
@@ -550,7 +587,7 @@ class Enumeration:
     def __init__(self, identifier, literals):
         self.identifier = identifier
         self.literals = [l.lower() for l in literals]
-        self.width = symbolic_math.logceil(len(literals))
+        self.width = math_parser.logceil(len(literals))
 
     def __str__(self):
         return self.identifier
@@ -574,7 +611,7 @@ class Enumeration:
 
     def from_slv(self, slv, generics):
         data, reduced_slv = self.reduce_slv(slv, generics)
-        assert(reduced_slv == '')
+        assert reduced_slv == ''
         return data
 
     def declaration(self):
