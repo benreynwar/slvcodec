@@ -12,13 +12,10 @@ import random
 import fusesoc_generators
 from slvcodec import add_slvcodec_files
 from slvcodec import filetestbench_generator
-from slvcodec import params_helper, config
+from slvcodec import config
 
 
 logger = logging.getLogger(__name__)
-
-dir_path = os.path.dirname(os.path.realpath(__file__))
-helper_files = os.path.join(dir_path, 'vhdl', '*.vhd')
 
 
 def register_rawtest_with_vunit(
@@ -37,27 +34,21 @@ def register_rawtest_with_vunit(
          returns an object with make_input_data and check_output_data methods.
       `top_params`: Top level parameters to pass to the test class.
     '''
+    # FIXME: Currently we create a new lib for each test.
+    # This is very inefficient.
     random_lib_name = 'lib' + str(random.randint(0, 1000000))
     try:
         lib = vu.library(random_lib_name)
     except KeyError:
         lib = vu.add_library(random_lib_name)
-    logger.debug('Adding files to lib {}'.format(filenames))
+    logger.debug('Adding files to lib %s', str(filenames))
     lib.add_source_files(filenames)
     tb_generated = lib.entity(top_entity + '_tb')
     entity = resolved['entities'][top_entity]
-    names = {}
-    for generics in all_generics:
+    for generics_index, generics in enumerate(all_generics):
         test = test_class(resolved, generics, top_params)
-        name = str(random.randint(0, 1000000))
-        if name not in names:
-            names[name] = 1
-            name_with_suffix = name
-        else:
-            names[name] += 1
-            name_with_suffix = name + '_' + str(names[name])
         tb_generated.add_config(
-            name=name_with_suffix,
+            name=str(generics_index),
             generics=generics,
             pre_config=make_pre_config(test, entity, generics),
             post_check=make_post_check(test, entity, generics),
@@ -84,7 +75,7 @@ def register_test_with_vunit(
     if os.path.exists(ftb_directory):
         shutil.rmtree(ftb_directory)
     os.makedirs(ftb_directory)
-    logger.debug('update_vunit deleting {}'.format(ftb_directory))
+    logger.debug('update_vunit deleting %s', ftb_directory)
     with_slvcodec_files = add_slvcodec_files(directory, filenames)
     generated_fns, resolved = filetestbench_generator.prepare_files(
         directory=ftb_directory, filenames=with_slvcodec_files,
@@ -108,7 +99,7 @@ def register_coretest_with_vunit(vu, test, test_output_directory):
       `vu`: A vunit instance.
       `test_output_directory`: A directory in which generated files are placed.
       `test`: A dictionary containing:
-        `param_sets`: An iteratable of top_params with lists of generics.  
+        `param_sets`: An iteratable of top_params with lists of generics.
         `core_name`: The name of the fusesoc core to test.
         `top_entity`: The name of the entity to test.
         `generator`: A function that takes (resolved, generics, top_params) and
@@ -126,19 +117,15 @@ def register_coretest_with_vunit(vu, test, test_output_directory):
             'generic_sets': [{}],
             'top_params': {},
         }]
-    for param_set in param_sets:
+    for param_set_index, param_set in enumerate(param_sets):
         generic_sets = param_set['generic_sets']
         top_params = param_set['top_params']
-        h = hash(params_helper.make_hashable(top_params))
         generation_directory = os.path.join(
-            test_output_directory, test['core_name'], 'generated_{}'.format(h))
+            test_output_directory, test['core_name'], 'generated_{}'.format(param_set_index))
         if os.path.exists(generation_directory):
             shutil.rmtree(generation_directory)
-        logger.debug('Removing directory {}'.format(generation_directory))
+        logger.debug('Removing directory %s', generation_directory)
         os.makedirs(generation_directory)
-        # Create this side effect object so that we can create a function
-        # that has the interface fusesoc_generator expects but we can still
-        # get access to the 'resolved' from parsing.
         filenames = fusesoc_generators.get_filenames_from_core(
             generation_directory, test['core_name'], test['entity_name'],
             generic_sets, top_params, add_slvcodec_files)
@@ -260,6 +247,23 @@ class WrapperTest:
 
 
 def split_data(is_splits, data, include_initial=False):
+    '''
+    The list `data` is split into a list of sublists where the
+    position of the splits is given by `is_splits`.
+
+    `is_splits` is a list containing boolean values.  If the
+    value is true then that position corresponds to the first
+    position in a sublist.
+
+    >>> split_data(is_splits=[0, 0, 1, 0, 1, 0, 0, 1],
+    ...            data=[1, 2, 3, 4, 5, 6, 7, 8],
+    ...            include_initial=False)
+    [[3, 4], [5, 6, 7], [8]]
+    >>> split_data(is_splits=[0, 0, 1, 0, 1, 0, 0, 1],
+    ...            data=[1, 2, 3, 4, 5, 6, 7, 8],
+    ...            include_initial=True)
+    [[1, 2], [3, 4], [5, 6, 7], [8]]
+    '''
     split_datas = []
     if include_initial:
         this_data = []

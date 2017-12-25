@@ -1,7 +1,7 @@
 import collections
 import logging
 
-from slvcodec import package, dependencies, typ_parser, math_parser, typs, errors
+from slvcodec import package, math_parser, typs, resolution
 
 
 logger = logging.getLogger(__name__)
@@ -12,6 +12,9 @@ CLOCK_NAMES = ('clk', 'clock')
 
 
 class Port:
+    '''
+    A resolved or unresolved entity port.
+    '''
 
     def __init__(self, name, direction, typ):
         self.name = name
@@ -45,7 +48,7 @@ class UnresolvedEntity:
         if port.typ in available_types:
             resolved_typ = available_types[port.typ]
         elif isinstance(port.typ, str):
-            raise errors.ResolutionError(
+            raise resolution.ResolutionError(
                 'Failed to resolve port of type "{}".  '.format(port.type) +
                 'Perhaps a use statement is missing.')
         else:
@@ -54,7 +57,7 @@ class UnresolvedEntity:
         resolved_port = Port(name=port.name, direction=port.direction,
                              typ=resolved_typ)
         if resolved_port.typ.unconstrained:
-            raise errors.ResolutionError('Entity {}: Port {}: unconstrained port'.format(
+            raise resolution.ResolutionError('Entity {}: Port {}: unconstrained port'.format(
                 self.identifier, port.name))
         return resolved_port
 
@@ -78,14 +81,14 @@ class UnresolvedEntity:
                     available_types=available_types,
                     available_constants=available_constants_generics)
                 resolved_ports[name] = resolved_port
-            except errors.ResolutionError as error:
+            except resolution.ResolutionError as error:
                 # If we can't resolve and `must_resolve` isn't True then we just
                 # skip ports that we can't resolve.
                 if must_resolve:
                     error_msg = 'Failed to resolve port {} in entity {}.'.format(
                         self.identifier, port.name)
                     error_msg += '  ' + error.args[0]
-                    raise errors.ResolutionError(error_msg) from error
+                    raise resolution.ResolutionError(error_msg) from error
         resolved_entity = Entity(
             identifier=self.identifier,
             generics=self.generics,

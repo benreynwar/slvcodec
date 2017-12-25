@@ -3,7 +3,7 @@ import os
 
 import jinja2
 
-from slvcodec import entity, package, typs, package_generator, config, vhdl_parser
+from slvcodec import entity, typs, package_generator, config, vhdl_parser
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,8 @@ def make_filetestbench(enty):
         for u in enty.uses.values()])
     use_clauses += '\n' + '\n'.join([
         'use {}.{}_slvcodec.{};'.format(u.library, u.design_unit, u.name_within)
-        for u in enty.uses.values() if u.library not in ('ieee', 'std') and '_slvcodec' not in u.design_unit])
+        for u in enty.uses.values()
+        if u.library not in ('ieee', 'std') and '_slvcodec' not in u.design_unit])
     # Get the list of generic parameters for the testbench.
     generic_params = '\n'.join(['{}: {};'.format(g.name, g.typ)
                                 for g in enty.generics.values()])

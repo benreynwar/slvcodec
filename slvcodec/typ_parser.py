@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 def process_parsed_type(typ):
     '''
-    Processes a type object produced by the vhdl_parser module.
+    Processes a type object produced by the inner_vhdl_parser module.
     '''
     if isinstance(typ, inner_vhdl_parser.VHDLSubtype):
         success = process_subtype(typ)

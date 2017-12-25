@@ -32,19 +32,19 @@ def make_record_declarations_and_definitions(record_type):
     declarations = declarations_template.format(
         type=record_type,
         width_expression=math_parser.str_expression(record_type.width),
-        )
+    )
     template_fn = os.path.join(os.path.dirname(__file__), 'templates',
                                'slvcodec_record_template.vhd')
     with open(template_fn, 'r') as f:
         definitions_template = jinja2.Template(f.read())
-    indices_names_and_widths = []
+        indices_names_and_widths = []
     for index, name_and_subtype in enumerate(record_type.names_and_subtypes):
         name, subtype = name_and_subtype
         indices_names_and_widths.append(
             (index, name, math_parser.str_expression(subtype.width)))
-    definitions = definitions_template.render(
-        type=record_type.identifier,
-        indices_names_and_widths=indices_names_and_widths)
+        definitions = definitions_template.render(
+            type=record_type.identifier,
+            indices_names_and_widths=indices_names_and_widths)
     return declarations, definitions
 
 
@@ -56,15 +56,15 @@ def make_enumeration_declarations_and_definitions(enumeration_type):
     declarations = declarations_template.format(
         type=enumeration_type,
         width_expression=math_parser.str_expression(enumeration_type.width),
-        )
+    )
     template_fn = os.path.join(os.path.dirname(__file__), 'templates',
                                'slvcodec_enumeration_template.vhd')
     with open(template_fn, 'r') as f:
         definitions_template = jinja2.Template(f.read())
-    definitions = definitions_template.render(
-        type=enumeration_type.identifier,
-        literals=enumeration_type.literals,
-        n_literals=len(enumeration_type.literals),
+        definitions = definitions_template.render(
+            type=enumeration_type.identifier,
+            literals=enumeration_type.literals,
+            n_literals=len(enumeration_type.literals),
         )
     return declarations, definitions
 
@@ -79,7 +79,7 @@ def make_array_declarations_and_definitions(array_type):
         width_declaration = width_declarations_template.format(
             type=array_type,
             width_expression=width_expression,
-            )
+        )
         if array_type.unconstrained_type.identifier is None:
             subtype_width = math_parser.str_expression(
                 array_type.unconstrained_type.subtype.width)

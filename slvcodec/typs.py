@@ -11,7 +11,7 @@ resolved type and constant objects.
 
 import logging
 
-from slvcodec import math_parser, conversions, errors
+from slvcodec import math_parser, conversions, resolution
 
 
 logger = logging.getLogger(__name__)
@@ -94,7 +94,7 @@ def resolve_expression(expression, constants):
     constant_dependencies = math_parser.get_constant_list(expression)
     missing_constants = set(constant_dependencies) - set(constants.keys())
     if missing_constants:
-        raise errors.ResolutionError('Missing constants {}'.format(missing_constants))
+        raise resolution.ResolutionError('Missing constants {}'.format(missing_constants))
     if constant_dependencies:
         resolved_e = math_parser.make_substitute_function(constants)(expression)
     else:
@@ -181,7 +181,7 @@ class UnresolvedConstrainedArray:
         '''
         if self.unconstrained_type_identifier is not None:
             if self.unconstrained_type_identifier not in types:
-                raise errors.ResolutionError(
+                raise resolution.ResolutionError(
                     '{} is not a known type.'.format(self.unconstrained_type_identifier))
             unconstrained_type = types[self.unconstrained_type_identifier]
         else:

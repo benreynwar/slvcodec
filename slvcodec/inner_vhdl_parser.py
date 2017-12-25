@@ -7,9 +7,12 @@
 # Copyright (c) 2017 Ben Reynwar ben@reynwar.net
 
 # pylint: disable=too-many-lines
+#
+# This file pretty much the file vhdl_parser.py from VUnit.
 
 """
-VHDL parsing functionality
+VHDL parsing functionality.
+Taken from VUnit.
 """
 
 import re

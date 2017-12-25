@@ -7,7 +7,6 @@ import tokenize
 import collections
 import logging
 import math
-from collections import namedtuple
 from io import StringIO
 
 
@@ -36,6 +35,7 @@ def logceil(argument):
     return value
 
 
+# These are the default functions that can be parsed from the VHDL.
 REGISTERED_FUNCTIONS = {
     'logceil': logceil,
     'clog2': logceil,
@@ -56,13 +56,11 @@ def register_function(name, function):
     REGISTERED_FUNCTIONS[name] = function
 
 
-class SymbolicMathError(Exception):
+class MathParsingError(Exception):
     '''
     An exception parsing math.
     '''
     pass
-
-
 
 
 def as_number(v):
@@ -156,7 +154,7 @@ def str_expression(item):
     elif hasattr(item, 'str_expression'):
         o = item.str_expression()
     else:
-        raise SymbolicMathError('Cannot use str_expression on {}'.format(item))
+        raise MathParsingError('Cannot use str_expression on {}'.format(item))
     return o
 
 
@@ -306,7 +304,7 @@ def get_value(item):
     return result
 
 
-ExpressionBase = namedtuple('ExpressionBase', ['items'])
+ExpressionBase = collections.namedtuple('ExpressionBase', ['items'])
 class Expression(ExpressionBase):
     '''
     An expression is just a list of tokens and parsed elements.
@@ -332,7 +330,7 @@ class Expression(ExpressionBase):
         return collected
 
     def value(self):
-        raise SymbolicMathError('Cannot get value of a unparsed expression.')
+        raise MathParsingError('Cannot get value of a unparsed expression.')
 
     def str_expression(self):
         return ' '.join([str_expression(item) for item in self.items])
@@ -397,7 +395,7 @@ class Expression(ExpressionBase):
                     new_expression.append(sub_expression)
                     stack = []
                 elif open_braces == 0:
-                    raise SymbolicMathError('More closing than opening braces')
+                    raise MathParsingError('More closing than opening braces')
                 else:
                     stack.append(item)
                 open_braces -= 1
@@ -406,7 +404,7 @@ class Expression(ExpressionBase):
             else:
                 new_expression.append(parse_parentheses(item))
         if open_braces > 0:
-            raise SymbolicMathError('All braces not closed.')
+            raise MathParsingError('All braces not closed.')
         return Expression(new_expression)
 
     @staticmethod
@@ -489,7 +487,7 @@ class Expression(ExpressionBase):
         return o
 
 
-UnknownBase = namedtuple('UnknownBase', ['items'])
+UnknownBase = collections.namedtuple('UnknownBase', ['items'])
 class Unknown(UnknownBase):
     '''
     A dummy object into which we can throw things we fail to parse without
@@ -503,10 +501,10 @@ class Unknown(UnknownBase):
         return []
 
     def value(self):
-        raise SymbolicMathError('Cannot get value of Unknown.')
+        raise MathParsingError('Cannot get value of Unknown.')
 
 
-FunctionBase = namedtuple('FunctionBase', ['name', 'argument'])
+FunctionBase = collections.namedtuple('FunctionBase', ['name', 'argument'])
 class Function(FunctionBase):
     '''
     Represents a function in the expression.  Currently it
@@ -527,7 +525,7 @@ class Function(FunctionBase):
         if self.name in REGISTERED_FUNCTIONS:
             v = REGISTERED_FUNCTIONS[self.name](argument)
         else:
-            raise SymbolicMathError('Unknown function {}'.format(self.name))
+            raise MathParsingError('Unknown function {}'.format(self.name))
         return v
 
     def simplify(self):
@@ -543,7 +541,7 @@ class Function(FunctionBase):
         return s
 
 
-PowerBase = namedtuple('TermBase', ['number', 'expression'])
+PowerBase = collections.namedtuple('TermBase', ['number', 'expression'])
 class Power(PowerBase):
     '''
     A multiplication object contains many Power objects.  This is to make
@@ -597,7 +595,7 @@ class Power(PowerBase):
         return s
 
 
-MultiplicationBase = namedtuple('MultiplicationBase', ['powers'])
+MultiplicationBase = collections.namedtuple('MultiplicationBase', ['powers'])
 class Multiplication(MultiplicationBase):
     '''
     A group of items which are multiplied/divided together.
@@ -693,7 +691,7 @@ class Multiplication(MultiplicationBase):
         return Multiplication(powers)
 
 
-TermBase = namedtuple('TermBase', ['number', 'expression'])
+TermBase = collections.namedtuple('TermBase', ['number', 'expression'])
 class Term(TermBase):
     '''
     An Addition object contains many Term objects.
@@ -743,7 +741,7 @@ class Term(TermBase):
         return s
 
 
-AdditionBase = namedtuple('AdditionBase', ['terms'])
+AdditionBase = collections.namedtuple('AdditionBase', ['terms'])
 class Addition(AdditionBase):
     '''
     Many items that are added/substracted together.
@@ -811,7 +809,7 @@ class Addition(AdditionBase):
                     sign = -1 * sign
             else:
                 if sign is None:
-                    raise SymbolicMathError('Unknown sign')
+                    raise MathParsingError('Unknown sign')
                 numbers.append(sign)
                 expressions.append(e)
                 sign = None
@@ -903,7 +901,7 @@ def parse(item):
     Parsed a tokenized string.
     '''
     if '**' in item.items:
-        raise SymbolicMathError('symbolic math cannot parse power "**" syntax')
+        raise MathParsingError('symbolic math cannot parse power "**" syntax')
     parsed_integers = parse_integers(item)
     parsed_parentheses = parse_parentheses(parsed_integers)
     parsed_functions = parse_functions(parsed_parentheses)

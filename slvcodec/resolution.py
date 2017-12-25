@@ -4,6 +4,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class ResolutionError(Exception):
+    pass
+
+
 def resolve_dependencies(available, unresolved, dependencies, resolve_function):
     '''
     Resolves dependencies.
