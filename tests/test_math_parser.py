@@ -53,7 +53,7 @@ def test_simplifications():
 
 def test_fails_on_power():
     string = '2 ** 6'
-    with pytest.raises(sm.SymbolicMathError) as e:
+    with pytest.raises(sm.MathParsingError) as e:
         simplified = sm.parse_and_simplify(string)
     message = e.value.args[0]
     assert all([s in message for s in ('**', 'power')])
