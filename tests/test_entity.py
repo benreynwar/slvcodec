@@ -1,6 +1,7 @@
 import logging
 import os
 import random
+import shutil
 
 from slvcodec import filetestbench_generator
 from slvcodec import entity, package, typs, config, vhdl_parser
@@ -31,6 +32,8 @@ def test_dummy_width():
 
 def test_conversion():
     output_dir = os.path.join(testoutput_dir, 'test_conversion')
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir)
     max_data = pow(2, 6)-1
     data = [{
         'reset': random.randint(0, 1),
