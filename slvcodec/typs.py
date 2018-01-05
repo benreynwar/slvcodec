@@ -406,12 +406,19 @@ class ConstrainedStdLogicVector:
 
 
 class Unsigned(StdLogicVector):
+    '''
+    A python description of the unsigned type.
+    '''
 
     def __init__(self):
         Array.__init__(self, identifier='unsigned', subtype=std_logic)
 
 
 class UnresolvedConstrainedUnsigned(UnresolvedConstrainedStdLogicVector):
+    '''
+    A unsigned with a defined length but with the constants that
+    define the length unresolved.
+    '''
 
     def resolve(self, types, constants):
         size = resolve_expression(self.size, constants)
@@ -420,17 +427,28 @@ class UnresolvedConstrainedUnsigned(UnresolvedConstrainedStdLogicVector):
 
 
 class ConstrainedUnsigned(ConstrainedStdLogicVector):
+    '''
+    A unsigned with a defined length, with the constants that
+    define the length resolved.
+    '''
 
     unconstrained_name = 'unsigned'
 
 
 class Signed(StdLogicVector):
+    '''
+    A python description of the signed type.
+    '''
 
     def __init__(self):
         Array.__init__(self, identifier='signed', subtype=std_logic)
 
 
 class UnresolvedConstrainedSigned(UnresolvedConstrainedStdLogicVector):
+    '''
+    A signed with a defined length but with the constants that
+    define the length unresolved.
+    '''
 
     def resolve(self, types, constants):
         size = resolve_expression(self.size, constants)
@@ -439,6 +457,10 @@ class UnresolvedConstrainedSigned(UnresolvedConstrainedStdLogicVector):
 
 
 class ConstrainedSigned(ConstrainedStdLogicVector):
+    '''
+    A signed with a defined length, with the constants that
+    define the length resolved.
+    '''
 
     resolved = True
     unconstrained_name = 'signed'
@@ -475,23 +497,10 @@ class ConstrainedSigned(ConstrainedStdLogicVector):
         return data
 
 
-def type_width_constant(typ):
-    '''
-    Determine the width of a type to use in an expression.
-    '''
-    if isinstance(typ, StdLogic):
-        width = '1'
-    elif isinstance(typ, ConstrainedStdLogicVector):
-        width = typ.size
-    elif isinstance(typ, ConstrainedArray):
-        width = math_parser.Multiplication(
-            [typ.unconstrained_type.identifier, typ.size], [])
-    else:
-        width = '{}_slvcodecwidth'.format(typ.identifier)
-    return width
-
-
 class UnresolvedRecord:
+    '''
+    A record with constants that define it unresolved.
+    '''
 
     resolved = False
     unconstrained = False
@@ -524,6 +533,9 @@ class UnresolvedRecord:
 
 
 class Record:
+    '''
+    A record with constants that define it resolved.
+    '''
 
     resolved = True
     unconstrained = False
@@ -579,6 +591,9 @@ class Record:
 
 
 class Enumeration:
+    '''
+    A python representation of the enumeration type.
+    '''
 
     resolved = True
     type_dependencies = tuple()

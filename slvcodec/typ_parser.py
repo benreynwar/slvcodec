@@ -25,12 +25,18 @@ def process_parsed_type(typ):
 
 
 def get_size(typ):
+    '''
+    Get an expression for the size of an array.
+    Takes the parsed type from the inner_vhdl_parser module.
+    Returns a math_parser expression.
+    '''
     if (typ.range2.left is not None) or (typ.range2.right is not None):
         raise Exception('Cannot handle 2D arrays.')
     lower_expression, upper_expression = get_bounds(typ.range1)
     if (lower_expression is None) and (upper_expression is None):
         size = None
     else:
+        # Get upper_expression + 1 - lower_expression
         size = math_parser.simplify(math_parser.Addition([
             math_parser.Term(number=n, expression=e) for n, e in
             ((1, upper_expression), (1, 1), (-1, lower_expression))]))
@@ -38,6 +44,10 @@ def get_size(typ):
 
 
 def get_bounds(type_range):
+    '''
+    Takes a type parsed by inner_vhdl_module and returns math_parser
+    expressions for the upper and lower bounds.
+    '''
     if type_range is None:
         upper = None
         lower = None
@@ -63,6 +73,15 @@ def get_bounds(type_range):
 
 
 def get_constraint_bounds(constraint):
+    '''
+    Takes a VHDL constraint and return math_parser expressions
+    for the lower and upper bounds.
+
+    >>> get_constraint_bounds('   (3+6 to 7)  ')
+    (9, 7)
+    >>> get_constraint_bounds('(26 downto 10*2 )')
+    (20, 26)
+    '''
     _constrained_range_re = re.compile(r"""
         \s*\(
         \s*(?P<range_left>.+?)
@@ -84,15 +103,24 @@ def get_constraint_bounds(constraint):
         size = math_parser.parse_and_simplify(size_as_string)
     else:
         raise Exception('Failed to parse constraint.')
-    return high_expr, low_expr
+    return low_expr, high_expr
 
 
 def get_range_bounds(type_range):
+    '''
+    Takes a VHDL range and return math_parser expressions
+    for the lower and upper bounds.
+
+    >>> get_range_bounds('range 17 to 201')
+    (17, 201)
+    >>> get_range_bounds('range 7*2 downto 7*1')
+    (7, 14)
+    '''
     _type_range_re = re.compile(r"""
         \s*range
         \s*(?P<range_left>.+?)
         \s+(?P<direction>to|downto)\s+
-        (?P<range_right>.+?)\s*
+        (?P<range_right>.+?)\s*$
         """, re.MULTILINE | re.IGNORECASE | re.VERBOSE | re.DOTALL)
     match = _type_range_re.match(type_range)
     if match:
@@ -111,13 +139,24 @@ def get_range_bounds(type_range):
 
 
 def get_constraint_size(constraint):
-    high, low = get_constraint_bounds(constraint)
+    '''
+    Takes a vhdl constraint and return a math_parser expression for the size.
+
+    >>> get_constraint_size(' (FISH*2-1 downto FISH )')
+    'FISH'
+    >>> get_constraint_size('(FISH*5-1 downto 0)').str_expression()
+    'FISH*5'
+    '''
+    low, high = get_constraint_bounds(constraint)
     size = math_parser.parse_and_simplify('{} + 1 - {}'.format(
         math_parser.str_expression(high), math_parser.str_expression(low)))
     return size
 
 
 def process_subtype(typ):
+    '''
+    Takes a type produced by 'inner_vhdl_parser' and returns one from 'typs'.
+    '''
     subtype_mark = typ.subtype_indication.type_mark
     size = get_size(typ)
     if size is None:
@@ -149,6 +188,9 @@ def process_subtype(typ):
 
 
 def process_array_type(typ):
+    '''
+    Takes an array type produced by 'inner_vhdl_parser' and returns one from'typs'.
+    '''
     subtype_mark = typ.subtype_indication.type_mark
     if typ.subtype_indication.constraint:
         size = get_constraint_size(typ.subtype_indication.constraint)
@@ -182,6 +224,9 @@ def process_array_type(typ):
 
 
 def process_subtype_indication(subtype_indication):
+    '''
+    Takes an array type produced by 'inner_vhdl_parser' and returns one from'typs'.
+    '''
     constraint = subtype_indication.constraint
     type_mark = subtype_indication.type_mark
     if constraint:
@@ -216,6 +261,9 @@ def process_subtype_indication(subtype_indication):
 
 
 def process_record_type(typ):
+    '''
+    Takes an record type produced by 'inner_vhdl_parser' and returns one from'typs'.
+    '''
     constrained_subtypes = [
         process_subtype_indication(element.subtype_indication)
         for element in typ.elements]
@@ -230,6 +278,9 @@ def process_record_type(typ):
 
 
 def process_enumeration_type(typ):
+    '''
+    Takes an enumeration type produced by 'inner_vhdl_parser' and returns one from'typs'.
+    '''
     processed = typs.Enumeration(
         typ.identifier,
         typ.literals,
