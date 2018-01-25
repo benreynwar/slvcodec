@@ -117,14 +117,16 @@ def register_coretest_with_vunit(vu, test, test_output_directory):
             'generic_sets': [{}],
             'top_params': {},
         }]
+    generated_index = 0
     for param_set_index, param_set in enumerate(param_sets):
         generic_sets = param_set['generic_sets']
         top_params = param_set['top_params']
         generation_directory = os.path.join(
-            test_output_directory, test['core_name'], 'generated_{}'.format(param_set_index))
-        if os.path.exists(generation_directory):
-            shutil.rmtree(generation_directory)
-        logger.debug('Removing directory %s', generation_directory)
+            test_output_directory, test['core_name'], 'generated_{}'.format(generated_index))
+        while os.path.exists(generation_directory):
+            generated_index += 1
+            generation_directory = os.path.join(
+                test_output_directory, test['core_name'], 'generated_{}'.format(generated_index))
         os.makedirs(generation_directory)
         filenames = fusesoc_generators.get_filenames_from_core(
             generation_directory, test['core_name'], test['entity_name'],
