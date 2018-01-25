@@ -49,7 +49,7 @@ class UnresolvedEntity:
             resolved_typ = available_types[port.typ]
         elif isinstance(port.typ, str):
             raise resolution.ResolutionError(
-                'Failed to resolve port of type "{}".  '.format(port.type) +
+                'Failed to resolve port of type "{}".  '.format(port.typ) +
                 'Perhaps a use statement is missing.')
         else:
             resolved_typ = port.typ.resolve(

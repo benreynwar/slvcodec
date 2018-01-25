@@ -120,6 +120,20 @@ def parse_entity_string(code):
     return processed
 
 
+def clean_identifier(identifier):
+    '''
+    Strip any comments out of an identifier.
+    '''
+    lines = identifier.split('\n')
+    cleaned = ''
+    for line in lines:
+        index = line.find('--')
+        if index >= 0:
+            line = line[:index]
+        cleaned += line.strip()
+    return cleaned
+
+
 def process_parsed_entity(parsed_entity, parsed_uses):
     '''
     Processes the parse entity (output from VUnit inner_vhdl_parser)
@@ -132,7 +146,7 @@ def process_parsed_entity(parsed_entity, parsed_uses):
         ) for g in p_generics]
     p_ports = parsed_entity.ports
     ports = [entity.Port(
-        name=p.identifier,
+        name=clean_identifier(p.identifier),
         direction=p.mode,
         typ=typ_parser.process_subtype_indication(p.subtype_indication),
         ) for p in p_ports]

@@ -11,8 +11,10 @@ entity dummy is
   port (
     clk: in std_logic;
     reset: in std_logic;
+    -- the input stream
     i_valid: in std_logic;
     i_dummy: in t_dummy;
+    -- the output stream
     o_data: out array_of_data(LENGTH-1 downto 0);
     i_datas: in array_of_data(2 downto 0);
     o_firstdata: out t_data;
