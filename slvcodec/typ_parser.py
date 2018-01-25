@@ -145,7 +145,7 @@ def get_constraint_size(constraint):
     >>> get_constraint_size(' (FISH*2-1 downto FISH )')
     'FISH'
     >>> get_constraint_size('(FISH*5-1 downto 0)').str_expression()
-    'FISH*5'
+    '5*FISH'
     '''
     low, high = get_constraint_bounds(constraint)
     size = math_parser.parse_and_simplify('{} + 1 - {}'.format(
