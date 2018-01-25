@@ -48,7 +48,8 @@ def parse_package_string(code):
     '''
     Parse a string containing a package definition and it's 'use' statements.
     '''
-    parsed_packages = list(inner_vhdl_parser.VHDLPackage.find(code.lower()))
+    cleaned_code = inner_vhdl_parser.remove_comments(code.lower())
+    parsed_packages = list(inner_vhdl_parser.VHDLPackage.find(cleaned_code))
     parsed_uses = get_parsed_dependencies(inner_vhdl_parser.VHDLReference.find(code.lower()))
     assert len(parsed_packages) == 1
     processed = process_parsed_package(parsed_packages[0], parsed_uses)
@@ -113,7 +114,8 @@ def parse_entity_string(code):
     >>> ent.generics['fish'].typ
     'natural'
     '''
-    parsed_entities = list(inner_vhdl_parser.VHDLEntity.find(code.lower()))
+    cleaned_code = inner_vhdl_parser.remove_comments(code.lower())
+    parsed_entities = list(inner_vhdl_parser.VHDLEntity.find(cleaned_code))
     parsed_uses = get_parsed_dependencies(inner_vhdl_parser.VHDLReference.find(code.lower()))
     assert len(parsed_entities) == 1
     processed = process_parsed_entity(parsed_entities[0], parsed_uses)
