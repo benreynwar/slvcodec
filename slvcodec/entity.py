@@ -24,6 +24,13 @@ class Port:
         self.direction = direction
         self.typ = typ
 
+    def width_as_str(self):
+        '''
+        Returns a string representing the port width.  May include
+        constants and generics.
+        '''
+        return math_parser.str_expression(self.typ.width)
+
 
 class UnresolvedEntity:
     '''

@@ -8,7 +8,42 @@ from slvcodec import entity, typs, package_generator, config, vhdl_parser
 logger = logging.getLogger(__name__)
 
 
-def make_filetestbench(enty):
+def make_double_wrapper(enty):
+    # Get the list of generic parameters for the testbench.
+    entity_generics = ';\n'.join(['{}: {}'.format(g.name, g.typ)
+                                  for g in enty.generics.values()])
+    wrapped_generics = ',\n'.join(['{} => {}'.format(g.name, g.name)
+                                   for g in enty.generics.values()])
+    # Generate use clauses required by the testbench.
+    use_clauses = '\n'.join([
+        'use {}.{}.{};'.format(u.library, u.design_unit, u.name_within)
+        for u in enty.uses.values()])
+    use_clauses += '\n' + '\n'.join([
+        'use {}.{}_slvcodec.{};'.format(u.library, u.design_unit, u.name_within)
+        for u in enty.uses.values()
+        if u.library not in ('ieee', 'std') and '_slvcodec' not in u.design_unit])
+    # Read in the toslvcodec template and format it.
+    template_and_wrapped_names = (
+        ('fromslvcodec.vhd', enty.identifier),
+        ('toslvcodec.vhd', enty.identifier + '_fromslvcodec'),
+        )
+    wrappers = []
+    for template_name, wrapped_name in template_and_wrapped_names:
+        template_fn = os.path.join(os.path.dirname(__file__), 'templates', template_name)
+        with open(template_fn, 'r') as f:
+            template = jinja2.Template(f.read())
+        wrappers.append(template.render(
+            entity_name=enty.identifier,
+            entity_generics=entity_generics,
+            use_clauses=use_clauses,
+            wrapped_generics=wrapped_generics,
+            wrapped_name=wrapped_name,
+            ports=list(enty.ports.values()),
+            ))
+    return wrappers
+
+
+def make_filetestbench(enty, add_double_wrapper=False):
     '''
     Generate a testbench that reads inputs from a file, and writes outputs to
     a file.
@@ -60,6 +95,10 @@ def make_filetestbench(enty):
     # Read in the testbench template and format it.
     template_fn = os.path.join(os.path.dirname(__file__), 'templates',
                                'file_testbench.vhd')
+    if add_double_wrapper:
+        dut_name = enty.identifier + '_toslvcodec'
+    else:
+        dut_name = enty.identifier
     with open(template_fn, 'r') as f:
         filetestbench_template = jinja2.Template(f.read())
     filetestbench = filetestbench_template.render(
@@ -68,14 +107,14 @@ def make_filetestbench(enty):
         generic_params=generic_params,
         definitions=definitions,
         dut_generics=dut_generics,
-        dut_name=enty.identifier,
+        dut_name=dut_name,
         clk_connections=clk_connections,
         connections=connections,
         )
     return filetestbench
 
 
-def prepare_files(directory, filenames, top_entity):
+def prepare_files(directory, filenames, top_entity, add_double_wrapper=False):
     '''
     Parses VHDL files, and generates a testbench for `top_entity`.
     Returns a tuple of a list of testbench files, and a dictionary
@@ -89,11 +128,19 @@ def prepare_files(directory, filenames, top_entity):
         os.path.join(config.vhdldir, 'clock.vhd'),
     ]
     # Make file testbench
-    ftb = make_filetestbench(resolved_entity)
+    ftb = make_filetestbench(resolved_entity, add_double_wrapper)
     ftb_fn = os.path.join(directory, '{}_tb.vhd'.format(
         resolved_entity.identifier))
     with open(ftb_fn, 'w') as f:
         f.write(ftb)
+    if add_double_wrapper:
+        wrappers = make_double_wrapper(resolved_entity)
+        fns = (os.path.join(directory, resolved_entity.identifier + '_fromslvcodec.vhd'),
+               os.path.join(directory, resolved_entity.identifier + '_toslvcodec.vhd'))
+        for wrapper, fn in zip(wrappers, fns):
+            with open(fn, 'w') as f:
+                f.write(wrapper)
+            new_fns.append(fn)
     new_fns.append(ftb_fn)
     resolved = {
         'entities': entities,

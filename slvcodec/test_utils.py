@@ -79,7 +79,8 @@ def register_test_with_vunit(
     with_slvcodec_files = add_slvcodec_files(directory, filenames)
     generated_fns, resolved = filetestbench_generator.prepare_files(
         directory=ftb_directory, filenames=with_slvcodec_files,
-        top_entity=top_entity)
+        top_entity=top_entity,
+    )
     combined_filenames = with_slvcodec_files + generated_fns
     register_rawtest_with_vunit(
         vu=vu,
@@ -137,7 +138,9 @@ def register_coretest_with_vunit(vu, test, test_output_directory):
         os.makedirs(ftb_directory)
         generated_fns, resolved = filetestbench_generator.prepare_files(
             directory=ftb_directory, filenames=filenames,
-            top_entity=test['entity_name'])
+            top_entity=test['entity_name'],
+            add_double_wrapper=True,
+            )
         combined_filenames = filenames + generated_fns
         register_rawtest_with_vunit(
             vu=vu,
@@ -162,6 +165,37 @@ def run_vunit(tests, cores_roots, test_output_directory):
     vu.main()
 
 
+def write_input_file(entity, generics, test, output_path):
+    '''
+    Generate the input data and write it to a file.
+    '''
+    i_data = test.make_input_data()
+    lines = [entity.inputs_to_slv(line, generics=generics) for line in i_data]
+    datainfilename = os.path.join(output_path, 'indata.dat')
+    with open(datainfilename, 'w') as f:
+        f.write('\n'.join(lines))
+
+
+def check_output_file(entity, generics, test, output_path):
+    '''
+    Read the input data and output data and run the check_output_data
+    function to verify that the test passes.
+    '''
+    # Read input data
+    datainfilename = os.path.join(output_path, 'indata.dat')
+    with open(datainfilename, 'r') as f:
+        lines = f.readlines()
+    i_data = [entity.inputs_from_slv(line, generics=generics) for line in lines]
+    # Read output dta.
+    dataoutfilename = os.path.join(output_path, 'outdata.dat')
+    with open(dataoutfilename, 'r') as f:
+        lines = f.readlines()
+    o_data = [entity.outputs_from_slv(line, generics=generics) for line in lines]
+    trimmed_o_data = o_data[:len(i_data)]
+    # Check validity.
+    test.check_output_data(i_data, trimmed_o_data)
+
+
 def make_pre_config(test, entity, generics):
     '''
     Create a function to run before running the simulator.
@@ -170,11 +204,7 @@ def make_pre_config(test, entity, generics):
         '''
         Generate the input data and write it to a file.
         '''
-        i_data = test.make_input_data()
-        lines = [entity.inputs_to_slv(line, generics=generics) for line in i_data]
-        datainfilename = os.path.join(output_path, 'indata.dat')
-        with open(datainfilename, 'w') as f:
-            f.write('\n'.join(lines))
+        write_input_file(entity=entity, generics=generics, test=test, output_path=output_path)
         return True
     return pre_config
 
@@ -188,19 +218,7 @@ def make_post_check(test, entity, generics):
         Read the input data and output data and run the check_output_data
         function to verify that the test passes.
         '''
-        # Read input data
-        datainfilename = os.path.join(output_path, 'indata.dat')
-        with open(datainfilename, 'r') as f:
-            lines = f.readlines()
-        i_data = [entity.inputs_from_slv(line, generics=generics) for line in lines]
-        # Read output dta.
-        dataoutfilename = os.path.join(output_path, 'outdata.dat')
-        with open(dataoutfilename, 'r') as f:
-            lines = f.readlines()
-        o_data = [entity.outputs_from_slv(line, generics=generics) for line in lines]
-        trimmed_o_data = o_data[:len(i_data)]
-        # Check validity.
-        test.check_output_data(i_data, trimmed_o_data)
+        check_output_file(entity=entity, generics=generics, test=test, output_path=output_path)
         return True
     return post_check
 
