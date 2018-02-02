@@ -20,10 +20,7 @@ begin
   {% for port in ports %}{% if port.direction == "in" %}{{port.name}}_untyped <= {% if port.typ.__str__() == "std_logic"%}{{port.name}}{% else %}to_slvcodec({{port.name}}){% endif %}{% else %}{{port.name}} <= {% if port.typ.__str__() == "std_logic" %}{{port.name}}_untyped{% else %}from_slvcodec({{port.name}}_untyped){% endif %}{% endif %};
   {% endfor %}
 
-  wrapped: entity work.{{wrapped_name}}{% if wrapped_generics %}
-    generic map(
-      {{wrapped_generics}}
-      ){% endif %}
+  wrapped: entity work.{{wrapped_name}}
     port map({% for port in ports%}
       {{port.name}} => {{port.name}}_untyped{% if not loop.last %},{% endif %}{% endfor %}
       );

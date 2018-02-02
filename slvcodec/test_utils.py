@@ -36,12 +36,15 @@ def register_rawtest_with_vunit(
     '''
     # FIXME: Currently we create a new lib for each test.
     # This is very inefficient.
-    random_lib_name = 'lib' + str(random.randint(0, 1000000))
-    try:
-        lib = vu.library(random_lib_name)
-    except KeyError:
-        lib = vu.add_library(random_lib_name)
-    logger.debug('Adding files to lib %s', str(filenames))
+    is_unique = False
+    while not is_unique:
+        random_lib_name = 'lib' + str(random.randint(0, 1000000))
+        try:
+            lib = vu.library(random_lib_name)
+        except KeyError:
+            lib = vu.add_library(random_lib_name)
+            is_unique = True
+        logger.debug('Adding files to lib %s', str(filenames))
     lib.add_source_files(filenames)
     tb_generated = lib.entity(top_entity + '_tb')
     entity = resolved['entities'][top_entity]
@@ -139,7 +142,7 @@ def register_coretest_with_vunit(vu, test, test_output_directory):
         generated_fns, resolved = filetestbench_generator.prepare_files(
             directory=ftb_directory, filenames=filenames,
             top_entity=test['entity_name'],
-            add_double_wrapper=True,
+            add_double_wrapper=False,
             )
         combined_filenames = filenames + generated_fns
         register_rawtest_with_vunit(
@@ -165,18 +168,20 @@ def run_vunit(tests, cores_roots, test_output_directory):
     vu.main()
 
 
-def write_input_file(entity, generics, test, output_path):
+def write_input_file(entity, generics, test, output_path, first_line_repeats=0):
     '''
     Generate the input data and write it to a file.
     '''
     i_data = test.make_input_data()
     lines = [entity.inputs_to_slv(line, generics=generics) for line in i_data]
+    if first_line_repeats > 0:
+        lines = [lines[0]] * first_line_repeats + lines
     datainfilename = os.path.join(output_path, 'indata.dat')
     with open(datainfilename, 'w') as f:
         f.write('\n'.join(lines))
 
 
-def check_output_file(entity, generics, test, output_path):
+def check_output_file(entity, generics, test, output_path, first_line_repeats=0):
     '''
     Read the input data and output data and run the check_output_data
     function to verify that the test passes.
@@ -185,12 +190,14 @@ def check_output_file(entity, generics, test, output_path):
     datainfilename = os.path.join(output_path, 'indata.dat')
     with open(datainfilename, 'r') as f:
         lines = f.readlines()
-    i_data = [entity.inputs_from_slv(line, generics=generics) for line in lines]
+    i_data = [entity.inputs_from_slv(line, generics=generics)
+              for line in lines][first_line_repeats:]
     # Read output dta.
     dataoutfilename = os.path.join(output_path, 'outdata.dat')
     with open(dataoutfilename, 'r') as f:
         lines = f.readlines()
-    o_data = [entity.outputs_from_slv(line, generics=generics) for line in lines]
+    o_data = [entity.outputs_from_slv(line, generics=generics)
+              for line in lines][first_line_repeats:]
     trimmed_o_data = o_data[:len(i_data)]
     # Check validity.
     test.check_output_data(i_data, trimmed_o_data)

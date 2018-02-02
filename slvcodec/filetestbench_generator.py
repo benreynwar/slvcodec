@@ -8,10 +8,20 @@ from slvcodec import entity, typs, package_generator, config, vhdl_parser
 logger = logging.getLogger(__name__)
 
 
-def make_double_wrapper(enty):
+def make_double_wrapper(enty, default_generics=None):
+    if default_generics is None:
+        default_generics = {}
     # Get the list of generic parameters for the testbench.
     entity_generics = ';\n'.join(['{}: {}'.format(g.name, g.typ)
                                   for g in enty.generics.values()])
+    entity_generics_with_defaults = []
+    for g in enty.generics.values():
+        as_str = '{}: {}'.format(g.name, g.typ)
+        if g.name in default_generics:
+            as_str += ' := {}'.format(default_generics[g.name])
+        as_str += ';'
+        entity_generics_with_defaults.append(as_str)
+    entity_generics_with_defaults = '\n'.join(entity_generics_with_defaults)[:-1]
     wrapped_generics = ',\n'.join(['{} => {}'.format(g.name, g.name)
                                    for g in enty.generics.values()])
     # Generate use clauses required by the testbench.
@@ -35,6 +45,7 @@ def make_double_wrapper(enty):
         wrappers.append(template.render(
             entity_name=enty.identifier,
             entity_generics=entity_generics,
+            entity_generics_with_defaults=entity_generics_with_defaults,
             use_clauses=use_clauses,
             wrapped_generics=wrapped_generics,
             wrapped_name=wrapped_name,
@@ -43,13 +54,16 @@ def make_double_wrapper(enty):
     return wrappers
 
 
-def make_filetestbench(enty, add_double_wrapper=False):
+def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
+                       default_output_path=None, default_generics=None):
     '''
     Generate a testbench that reads inputs from a file, and writes outputs to
     a file.
     Args:
       `enty`: A resolved entity object parsed from the VHDL.
     '''
+    if default_generics is None:
+        default_generics = {}
     # Generate a record type for the entity inputs (excluding clock).
     inputs = [p for p in enty.ports.values()
               if p.direction == 'in' and p.name not in entity.CLOCK_NAMES]
@@ -76,8 +90,14 @@ def make_filetestbench(enty, add_double_wrapper=False):
         for u in enty.uses.values()
         if u.library not in ('ieee', 'std') and '_slvcodec' not in u.design_unit])
     # Get the list of generic parameters for the testbench.
-    generic_params = '\n'.join(['{}: {};'.format(g.name, g.typ)
-                                for g in enty.generics.values()])
+    generic_params = []
+    for g in enty.generics.values():
+        as_str = '{}: {}'.format(g.name, g.typ)
+        if g.name in default_generics:
+            as_str += ' := {}'.format(default_generics[g.name])
+        as_str += ';'
+        generic_params.append(as_str)
+    generic_params = '\n'.join(generic_params)[:-1]
     # Combine the input and output record definitions with the slv conversion
     # functions.
     definitions = '\n'.join([
@@ -93,8 +113,12 @@ def make_filetestbench(enty, add_double_wrapper=False):
     dut_generics = ',\n'.join(['{} => {}'.format(g.name, g.name)
                                for g in enty.generics.values()])
     # Read in the testbench template and format it.
-    template_fn = os.path.join(os.path.dirname(__file__), 'templates',
-                               'file_testbench.vhd')
+    if use_vunit:
+        template_fn = os.path.join(os.path.dirname(__file__), 'templates',
+                                'file_testbench.vhd')
+    else:
+        template_fn = os.path.join(os.path.dirname(__file__), 'templates',
+                                'file_testbench_no_vunit.vhd')
     if add_double_wrapper:
         dut_name = enty.identifier + '_toslvcodec'
     else:
@@ -110,32 +134,41 @@ def make_filetestbench(enty, add_double_wrapper=False):
         dut_name=dut_name,
         clk_connections=clk_connections,
         connections=connections,
+        output_path=default_output_path,
         )
     return filetestbench
 
 
-def prepare_files(directory, filenames, top_entity, add_double_wrapper=False):
+def prepare_files(directory, filenames, top_entity, add_double_wrapper=False, use_vunit=True,
+                  dut_directory=None, default_generics=None, default_output_path=None):
     '''
     Parses VHDL files, and generates a testbench for `top_entity`.
     Returns a tuple of a list of testbench files, and a dictionary
     of parsed objects.
     '''
+    if dut_directory is None:
+        dut_directory = directory
     entities, packages = vhdl_parser.parse_and_resolve_files(filenames)
     resolved_entity = entities[top_entity]
-    new_fns = [
-        os.path.join(config.vhdldir, 'read_file.vhd'),
+    if use_vunit:
+        new_fns = [os.path.join(config.vhdldir, 'read_file.vhd')]
+    else:
+        new_fns = [os.path.join(config.vhdldir, 'read_file_no_vunit.vhd')]
+    new_fns += [
         os.path.join(config.vhdldir, 'write_file.vhd'),
         os.path.join(config.vhdldir, 'clock.vhd'),
     ]
     # Make file testbench
-    ftb = make_filetestbench(resolved_entity, add_double_wrapper)
+    ftb = make_filetestbench(resolved_entity, add_double_wrapper, use_vunit=use_vunit,
+                             default_generics=default_generics,
+                             default_output_path=default_output_path,)
     ftb_fn = os.path.join(directory, '{}_tb.vhd'.format(
         resolved_entity.identifier))
     with open(ftb_fn, 'w') as f:
         f.write(ftb)
     if add_double_wrapper:
-        wrappers = make_double_wrapper(resolved_entity)
-        fns = (os.path.join(directory, resolved_entity.identifier + '_fromslvcodec.vhd'),
+        wrappers = make_double_wrapper(resolved_entity, default_generics=default_generics)
+        fns = (os.path.join(dut_directory, resolved_entity.identifier + '_fromslvcodec.vhd'),
                os.path.join(directory, resolved_entity.identifier + '_toslvcodec.vhd'))
         for wrapper, fn in zip(wrappers, fns):
             with open(fn, 'w') as f:

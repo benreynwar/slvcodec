@@ -7,8 +7,7 @@ entity {{test_name}} is
   generic (
     {{generic_params}}{% if generic_params %};{% endif %}
     CLOCK_PERIOD: time := 10 ns;
-    RUNNER_CFG: string;
-    OUTPUT_PATH: string
+    OUTPUT_PATH: string{% if output_path %} := "{{output_path}}"{% endif %}
   );
 end entity;
  
@@ -28,7 +27,6 @@ begin
 
   file_reader: entity work.ReadFile
     generic map(FILENAME => OUTPUT_PATH & "/indata.dat",
-                PASSED_RUNNER_CFG => RUNNER_CFG,
                 WIDTH => t_input_slvcodecwidth)
     port map(clk => read_clk,
              out_data => input_slv);

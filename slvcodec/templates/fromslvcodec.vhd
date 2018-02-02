@@ -5,7 +5,7 @@ use work.slvcodec.all;
 
 entity {{entity_name}}_fromslvcodec is{% if entity_generics %}
   generic (
-    {{entity_generics}}
+    {{entity_generics_with_defaults}}
   );{% endif %}
   port ({% for port in ports %}
     {{port.name}}: {{port.direction}} {% if port.typ.__str__() == "std_logic" %}std_logic{% else %}std_logic_vector({{port.width_as_str()}}-1 downto 0){% endif %}{% if not loop.last%};{% endif %}{% endfor %}
