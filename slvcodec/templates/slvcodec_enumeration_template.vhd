@@ -12,7 +12,11 @@
     variable pos: integer range 0 to {{n_literals}}-1;
     variable data: {{type}};
   begin
-    pos := to_integer(unsigned(slv));
+    if is_X(slv) then
+      pos := 0;
+    else
+      pos := to_integer(unsigned(slv));
+    end if;
     case pos is {% for literal in literals %}
       when {{loop.index-1}} => data := {{literal}};{% endfor %}
     end case;
