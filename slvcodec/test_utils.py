@@ -80,11 +80,11 @@ def register_test_with_vunit(
     os.makedirs(ftb_directory)
     logger.debug('update_vunit deleting %s', ftb_directory)
     with_slvcodec_files = add_slvcodec_files(directory, filenames)
-    generated_fns, resolved = filetestbench_generator.prepare_files(
+    generated_fns, generated_wrapper_fns, resolved = filetestbench_generator.prepare_files(
         directory=ftb_directory, filenames=with_slvcodec_files,
         top_entity=top_entity,
     )
-    combined_filenames = with_slvcodec_files + generated_fns
+    combined_filenames = with_slvcodec_files + generated_fns + generated_wrapper_fns
     register_rawtest_with_vunit(
         vu=vu,
         resolved=resolved,
@@ -139,12 +139,12 @@ def register_coretest_with_vunit(vu, test, test_output_directory):
         if os.path.exists(ftb_directory):
             shutil.rmtree(ftb_directory)
         os.makedirs(ftb_directory)
-        generated_fns, resolved = filetestbench_generator.prepare_files(
+        generated_fns, generated_wrapper_fns, resolved = filetestbench_generator.prepare_files(
             directory=ftb_directory, filenames=filenames,
             top_entity=test['entity_name'],
             add_double_wrapper=False,
             )
-        combined_filenames = filenames + generated_fns
+        combined_filenames = filenames + generated_fns + generated_wrapper_fns
         register_rawtest_with_vunit(
             vu=vu,
             resolved=resolved,
@@ -179,6 +179,7 @@ def write_input_file(entity, generics, test, output_path, first_line_repeats=0):
     datainfilename = os.path.join(output_path, 'indata.dat')
     with open(datainfilename, 'w') as f:
         f.write('\n'.join(lines))
+    return len(lines)
 
 
 def check_output_file(entity, generics, test, output_path, first_line_repeats=0):

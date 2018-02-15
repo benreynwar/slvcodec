@@ -146,15 +146,16 @@ def prepare_files(directory, filenames, top_entity, add_double_wrapper=False, us
     Returns a tuple of a list of testbench files, and a dictionary
     of parsed objects.
     '''
+    dut_fns = filenames[:]
     if dut_directory is None:
         dut_directory = directory
     entities, packages = vhdl_parser.parse_and_resolve_files(filenames)
     resolved_entity = entities[top_entity]
     if use_vunit:
-        new_fns = [os.path.join(config.vhdldir, 'read_file.vhd')]
+        tb_fns = [os.path.join(config.vhdldir, 'read_file.vhd')]
     else:
-        new_fns = [os.path.join(config.vhdldir, 'read_file_no_vunit.vhd')]
-    new_fns += [
+        tb_fns = [os.path.join(config.vhdldir, 'read_file_no_vunit.vhd')]
+    tb_fns += [
         os.path.join(config.vhdldir, 'write_file.vhd'),
         os.path.join(config.vhdldir, 'clock.vhd'),
     ]
@@ -167,19 +168,21 @@ def prepare_files(directory, filenames, top_entity, add_double_wrapper=False, us
     with open(ftb_fn, 'w') as f:
         f.write(ftb)
     if add_double_wrapper:
-        wrappers = make_double_wrapper(resolved_entity, default_generics=default_generics)
-        fns = (os.path.join(dut_directory, resolved_entity.identifier + '_fromslvcodec.vhd'),
-               os.path.join(directory, resolved_entity.identifier + '_toslvcodec.vhd'))
-        for wrapper, fn in zip(wrappers, fns):
-            with open(fn, 'w') as f:
-                f.write(wrapper)
-            new_fns.append(fn)
-    new_fns.append(ftb_fn)
+        fromslvcodec_wrapper, toslvcodec_wrapper = make_double_wrapper(resolved_entity, default_generics=default_generics)
+        fromslvcodec_fn = os.path.join(dut_directory, resolved_entity.identifier + '_fromslvcodec.vhd')
+        toslvcodec_fn = os.path.join(directory, resolved_entity.identifier + '_toslvcodec.vhd')
+        with open(fromslvcodec_fn, 'w') as f:
+            f.write(fromslvcodec_wrapper)
+            dut_fns.append(fromslvcodec_fn)
+        with open(toslvcodec_fn, 'w') as f:
+            f.write(toslvcodec_wrapper)
+            tb_fns.append(toslvcodec_fn)
+    tb_fns.append(ftb_fn)
     resolved = {
         'entities': entities,
         'packages': packages,
         }
-    return new_fns, resolved
+    return tb_fns, dut_fns, resolved
 
 
 def add_slvcodec_files(directory, filenames):

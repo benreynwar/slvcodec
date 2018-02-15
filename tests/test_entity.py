@@ -59,7 +59,7 @@ def test_conversion():
     ftb_directory = os.path.join(generation_directory, 'ftb')
     top_entity = 'dummy'
     os.mkdir(ftb_directory)
-    generated_fns, resolved = filetestbench_generator.prepare_files(
+    generated_tb_fns, generated_dut_fns, resolved = filetestbench_generator.prepare_files(
         directory=ftb_directory, filenames=with_slvcodec_files,
         top_entity=top_entity)
     ent = resolved['entities'][top_entity]
