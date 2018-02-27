@@ -129,6 +129,21 @@ def uint_to_list_of_sints(uint, size, width):
     return list_of_sints
 
 
+def sint_to_list_of_uints(sint, size, width):
+    '''
+    Convert a signed integer to a list of unsigned integers.
+
+    >>> uint_to_list_of_sints(-1, size=3, width=1)
+    [1, 1, 1]
+    '''
+    if sint is None:
+        list_of_uints = None
+    else:
+        uint = sint_to_uint(sint, size*width)
+        list_of_uints = uint_to_list_of_uints(uint=uint, size=size, width=width)
+    return list_of_uints
+
+
 def slv_to_uint(slv):
     '''
     Convert a string of '0' and '1' to an unsigned integer.
