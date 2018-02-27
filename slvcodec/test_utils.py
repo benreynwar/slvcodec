@@ -18,6 +18,14 @@ from slvcodec import config
 logger = logging.getLogger(__name__)
 
 
+def remove_duplicates(filenames):
+    new_filenames = []
+    for filename in filenames:
+        if filename not in new_filenames:
+            new_filenames.append(filename)
+    return new_filenames
+
+
 def register_rawtest_with_vunit(
         vu, resolved, filenames, top_entity, all_generics, test_class,
         top_params):
@@ -36,6 +44,7 @@ def register_rawtest_with_vunit(
     '''
     # FIXME: Currently we create a new lib for each test.
     # This is very inefficient.
+    filenames = remove_duplicates(filenames)
     is_unique = False
     while not is_unique:
         random_lib_name = 'lib' + str(random.randint(0, 1000000))
