@@ -11,6 +11,11 @@ logger = logging.getLogger(__name__)
 def make_double_wrapper(enty, default_generics=None):
     if default_generics is None:
         default_generics = {}
+    else:
+        default_generics = default_generics.copy()
+    for k, v in default_generics.items():
+        if isinstance(v, str) and (len(v) > 0) and (v[0] != "'"):
+            default_generics[k] = '"' + v + '"'
     # Get the list of generic parameters for the testbench.
     entity_generics = ';\n'.join(['{}: {}'.format(g.name, g.typ)
                                   for g in enty.generics.values()])
@@ -64,6 +69,11 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
     '''
     if default_generics is None:
         default_generics = {}
+    else:
+        default_generics = default_generics.copy()
+    for k, v in default_generics.items():
+        if isinstance(v, str) and (len(v) > 0) and (v[0] != "'"):
+            default_generics[k] = '"' + v + '"'
     # Generate a record type for the entity inputs (excluding clock).
     inputs = [p for p in enty.ports.values()
               if p.direction == 'in' and p.name not in entity.CLOCK_NAMES]
