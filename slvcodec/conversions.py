@@ -51,7 +51,7 @@ def uint_to_list_of_uints(uint, size, width):
     if uint is None:
         output = None
     else:
-        assert uint > 0
+        assert uint >= 0
         residual = uint
         f = pow(2, width)
         output = []
