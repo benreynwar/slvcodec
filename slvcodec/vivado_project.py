@@ -6,6 +6,7 @@ from pyvivado import base_project, vivado_project, boards, jtagtestbench_generat
 
 from slvcodec import add_slvcodec_files, filetestbench_generator, test_utils
 
+
 def from_fusesoc_core(
         directory, corename, entityname, generics, top_params,
         board_name=None, frequency=None, overwrite_ok=False,
@@ -24,8 +25,8 @@ def from_fusesoc_core(
         files_and_ip = jtagtestbench_generator.get_files_and_ip(
             directory, filenames, entityname, generics, board_params, frequency)
         resolved = {}
+        out_of_context = False
     elif testbench_type == 'file':
-        # Only import slvcodec if required since we don't want hard dependency.
         output_path = os.path.join(directory, 'simulation_output')
         tb_fns, wrapper_fns, resolved = filetestbench_generator.prepare_files(
             directory, filenames, entityname, add_double_wrapper=True, use_vunit=False,
@@ -36,6 +37,7 @@ def from_fusesoc_core(
             'ips': [],
             'top_module': entityname + '_fromslvcodec',
             }
+        out_of_context = True
     else:
         files_and_ip = {
             'design_files': filenames,
@@ -43,6 +45,7 @@ def from_fusesoc_core(
             'ips': [],
             'top_module': entityname,
         }
+        out_of_context = True
         resolved = {}
     p = base_project.BaseProject(
         directory=directory,
@@ -53,6 +56,9 @@ def from_fusesoc_core(
         project=p,
         board=board_name,
         wait_for_creation=True,
+        out_of_context=out_of_context,
+        frequency=frequency,
+        clock_name='clk',
         )
     return v, resolved
 
@@ -91,7 +97,7 @@ def run_vivado_test(directory, sim_type, test_spec):
             n_lines = test_utils.write_input_file(
                 entity, generics, test, output_path, first_line_repeats=first_line_repeats)
             runtime = '{}ns'.format(n_lines*10 + 200)
-            proj.run_simulation(test_name='axi_interconnect',
+            proj.run_simulation(test_name='my_test',
                                 test_bench_name=test_spec['entity_name'] + '_tb', runtime=runtime,
                                 sim_type='post_synthesis')
             test_utils.check_output_file(entity, generics, test, output_path,
