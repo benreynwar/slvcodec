@@ -51,6 +51,7 @@ def uint_to_list_of_uints(uint, size, width):
     if uint is None:
         output = None
     else:
+        assert uint > 0
         residual = uint
         f = pow(2, width)
         output = []
@@ -76,6 +77,9 @@ def sint_to_uint(sint, width):
         uint = sint + pow(2, width)
     else:
         uint = sint
+    if uint < 0:
+        print(sint, width, uint)
+    assert uint >= 0
     return uint
 
 
@@ -133,7 +137,7 @@ def sint_to_list_of_uints(sint, size, width):
     '''
     Convert a signed integer to a list of unsigned integers.
 
-    >>> uint_to_list_of_sints(-1, size=3, width=1)
+    >>> sint_to_list_of_uints(-1, size=3, width=1)
     [1, 1, 1]
     '''
     if sint is None:
