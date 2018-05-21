@@ -208,13 +208,23 @@ def parse_string(code):
     return parsed_entities, parsed_packages
 
 
-def parse_file(filename):
+def parse_file(filename, strict=False):
     '''
     Parse entity and package objects from a file.
     '''
     with open(filename, 'r') as f:
         code = f.read()
-    parsed_entities, parsed_packages = parse_string(code)
+    try:
+        parsed_entities, parsed_packages = parse_string(code)
+    except Exception as e:
+        # The parsing is pretty brittle.  Normally we want to fail gracefully and just
+        # skip the file if it doesn't parse.
+        if strict:
+            raise e
+        else:
+            logger.error('Failed to parse {}.  Skipping file.'.format(filename))
+            parsed_entities = []
+            parsed_packages = []
     return parsed_entities, parsed_packages
 
 
