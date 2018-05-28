@@ -1,5 +1,6 @@
 import collections
 import logging
+import re
 
 from slvcodec import package, math_parser, typs, resolution
 
@@ -133,13 +134,56 @@ class Entity(object):
             if (port.direction == 'in') and (port.name not in CLOCK_NAMES)])
         return input_ports
 
-    def inputs_to_slv(self, inputs, generics):
+    def group_ports_by_clock_domain(self, clock_domains):
+        '''
+        `clock_domains` is a dictionary associating a clock name, with a list of regex patterns
+        for the ports that are in that clock domain.
+
+        The function returns a dictionary mapping a clock name to a tuple of input and output
+        ports in that domain.
+        '''
+        clock_names = clock_domains.keys()
+        matched_names = set(clock_names)
+        grouped_ports = {}
+        for clock_name, signal_patterns in clock_domains.items():
+            regexes = [re.compile(pattern) for pattern in signal_patterns]
+            input_matches = [p for name, p in self.ports.items()
+                             if any([regex.match(name) for regex in regexes]) and
+                             (name not in clock_names) and (p.direction == 'in')]
+            input_match_names = [p.name for p in input_matches]
+            input_already_assigned = set(input_match_names) & matched_names
+            if input_already_assigned:
+                raise Exception('Signals {} are assigned to two clock domains'.format(
+                    input_already_assigned))
+            matched_names |= set(input_match_names)
+            output_matches = [p for name, p in self.ports.items()
+                              if any([regex.match(name) for regex in regexes]) and
+                              (name not in clock_names) and (p.direction == 'out')]
+            output_match_names = [p.name for p in output_matches]
+            output_already_assigned = (set(output_match_names) & matched_names)
+            if output_already_assigned:
+                raise Exception('Signals {} are assigned to two clock domains'.format(
+                    output_already_assigned))
+            matched_names |= set(output_match_names)
+            grouped_ports[clock_name] = (input_matches, output_matches)
+        all_names = set(self.ports.keys())
+        unassigned_names = all_names - matched_names
+        if unassigned_names:
+            raise Exception('Not all signals assigned: {}'.format(unassigned_names))
+        assert set(matched_names) == set(all_names)
+        return grouped_ports
+
+    def inputs_to_slv(self, inputs, generics, subset_only=False):
         '''
         Takes a dictionary of inputs, and a dictionary of generics parameters for the entity
         and produces a string of '0's and '1's representing the input values.
+        If `subset_only` is False then it is allowed that `inputs` is a subset of all the
+        input ports.  The generated slv will only contain values for those signals.
         '''
         slvs = []
         for port in self.input_ports().values():
+            if subset_only and (port.name not in inputs):
+                continue
             port_inputs = inputs.get(port.name, None)
             try:
                 port_slv = port.typ.to_slv(port_inputs, generics)
@@ -157,19 +201,21 @@ class Entity(object):
         slv = ''.join(reversed(slvs))
         return slv
 
-    def ports_from_slv(self, slv, generics, direction):
+    def ports_from_slv(self, slv, generics, direction, subset=None):
         '''
         Extract port values from an slv string.
 
         'slv': A string of 0's and 1's representing the port data.
         'generics': The generic parameters for the entity.
-        'directrion': Whether we are extracting input or output ports.
+        'direction': Whether we are extracting input or output ports.
+        `subset`: An optional list of the signals present in the slv.
         '''
         assert direction in ('in', 'out')
         pos = 0
         outputs = {}
         for port in self.ports.values():
-            if (port.direction == direction) and (port.name not in CLOCK_NAMES):
+            if ((port.direction == direction) and (port.name not in CLOCK_NAMES) and
+                    ((subset is None) or (port.name in subset))):
                 width_symbol = typs.make_substitute_generics_function(generics)(port.typ.width)
                 width = math_parser.get_value(width_symbol)
                 intwidth = int(width)
@@ -183,18 +229,18 @@ class Entity(object):
                 outputs[port.name] = port_value
         return outputs
 
-    def outputs_from_slv(self, slv, generics):
+    def outputs_from_slv(self, slv, generics, subset=None):
         '''
         Extract output port values from a string of 0's and 1's.
         '''
         slv = slv.strip()
-        data = self.ports_from_slv(slv, generics, 'out')
+        data = self.ports_from_slv(slv, generics, 'out', subset)
         return data
 
-    def inputs_from_slv(self, slv, generics):
+    def inputs_from_slv(self, slv, generics, subset=None):
         '''
         Extract input port values from a string of 0's and 1's.
         '''
         slv = slv.strip()
-        data = self.ports_from_slv(slv, generics, 'in')
+        data = self.ports_from_slv(slv, generics, 'in', subset)
         return data

@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 
 import jinja2
 
@@ -116,7 +117,8 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
         output_slv_declarations, output_slv_definitions])
     clk_names = [p.name for p in enty.ports.values()
                  if (p.direction == 'in') and (p.name in entity.CLOCK_NAMES)]
-    clk_connections = '\n'.join(['{} => {},'.format(clk, clk) for clk in clk_names])
+    assert len(clk_names) == 1
+    clk_connections = '\n'.join(['{} => clk,'.format(clk) for clk in clk_names])
     connections = ',\n'.join(['{} => {}.{}'.format(
         p.name, {'in': 'input_data', 'out': 'output_data'}[p.direction], p.name)
                               for p in enty.ports.values() if p.name not in clk_names])
@@ -125,10 +127,10 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
     # Read in the testbench template and format it.
     if use_vunit:
         template_fn = os.path.join(os.path.dirname(__file__), 'templates',
-                                'file_testbench.vhd')
+                                   'file_testbench.vhd')
     else:
         template_fn = os.path.join(os.path.dirname(__file__), 'templates',
-                                'file_testbench_no_vunit.vhd')
+                                   'file_testbench_no_vunit.vhd')
     if add_double_wrapper:
         dut_name = enty.identifier + '_toslvcodec'
     else:
@@ -149,8 +151,131 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
     return filetestbench
 
 
+def process_signals(signals, type_name):
+    names_and_types = [(p.name, p.typ) for p in signals]
+    record = typs.Record(type_name, names_and_types)
+    slv_declarations, slv_definitions = package_generator.make_record_declarations_and_definitions(
+        record)
+    if signals:
+        definitions = [record.declaration(), slv_declarations, slv_definitions]
+    else:
+        # When there are no signals don't bother writing definitions because an
+        # empty record definition is not allowed.
+        definitions = []
+    return {
+        'record': record,
+        'slv_declarations': slv_declarations,
+        'slv_definitions': slv_definitions,
+        'definitions': definitions,
+        }
+
+
+def make_use_clauses(enty):
+    # Generate use clauses required by the testbench.
+    use_clauses = '\n'.join([
+        'use {}.{}.{};'.format(u.library, u.design_unit, u.name_within)
+        for u in enty.uses.values()])
+    use_clauses += '\n' + '\n'.join([
+        'use {}.{}_slvcodec.{};'.format(u.library, u.design_unit, u.name_within)
+        for u in enty.uses.values()
+        if u.library not in ('ieee', 'std') and '_slvcodec' not in u.design_unit])
+    return use_clauses
+
+
+def make_generic_params(enty, default_generics=None):
+    # Get the list of generic parameters for the testbench.
+    if default_generics is None:
+        default_generics = {}
+    else:
+        default_generics = default_generics.copy()
+
+    generic_params = []
+    for k, v in default_generics.items():
+        if isinstance(v, str) and (len(v) > 0) and (v[0] != "'"):
+            default_generics[k] = '"' + v + '"'
+
+    for g in enty.generics.values():
+        as_str = '{}: {}'.format(g.name, g.typ)
+        if g.name in default_generics:
+            as_str += ' := {}'.format(default_generics[g.name])
+        as_str += ';'
+        generic_params.append(as_str)
+    generic_params = '\n'.join(generic_params)[:-1]
+    return generic_params
+
+
+def make_filetestbench_multiple_clocks(
+        enty, clock_domains, add_double_wrapper=False,
+        default_output_path=None, default_generics=None,
+        clock_periods=None, clock_offsets=None):
+    '''
+    Generate a testbench that reads inputs from a file, and writes outputs to
+    a file.
+    Args:
+      `enty`: A resolved entity object parsed from the VHDL.
+      `clock_domains`: An optional dictionary that maps clock_names to the
+         signals in their clock domains.
+    '''
+    grouped_ports = enty.group_ports_by_clock_domain(clock_domains)
+    definitions = []
+    connections = []
+    for clock_name, inputs_and_outputs in grouped_ports.items():
+        inputs, outputs = inputs_and_outputs
+        input_info = process_signals(inputs, 't_{}_inputs'.format(clock_name))
+        output_info = process_signals(outputs, 't_{}_outputs'.format(clock_name))
+        definitions += input_info['definitions'] + output_info['definitions']
+        for p in inputs:
+            connections.append('{} => {}_input_data.{}'.format(p.name, clock_name, p.name))
+        for p in outputs:
+            connections.append('{} => {}_output_data.{}'.format(p.name, clock_name, p.name))
+
+    use_clauses = make_use_clauses(enty)
+    generic_params = make_generic_params(enty, default_generics)
+
+    clock_names = clock_domains.keys()
+    # Combine the input and output record definitions with the slv conversion
+    # functions.
+    definitions = '\n'.join(definitions)
+    clk_connections = '\n'.join(['{} => {}_clk,'.format(clk, clk)
+                                 for clk in clock_names])
+    connections = ',\n'.join(connections)
+    dut_generics = ',\n'.join(['{} => {}'.format(g.name, g.name)
+                               for g in enty.generics.values()])
+    # Read in the testbench template and format it.
+    template_fn = os.path.join(os.path.dirname(__file__), 'templates',
+                               'file_testbench_multiple_clocks.vhd')
+    if add_double_wrapper:
+        dut_name = enty.identifier + '_toslvcodec'
+    else:
+        dut_name = enty.identifier
+    if clock_periods is None:
+        clock_periods = {}
+    if clock_offsets is None:
+        clock_offsets = {}
+    clock_infos = [(name, clock_periods.get(name, '10 ns'), clock_offsets.get(name, '0 ns'),
+                    len(clock_domains[name]) > 0)
+                   for name in clock_names]
+    with open(template_fn, 'r') as f:
+        filetestbench_template = jinja2.Template(f.read())
+    filetestbench = filetestbench_template.render(
+        test_name='{}_tb'.format(enty.identifier),
+        use_clauses=use_clauses,
+        generic_params=generic_params,
+        definitions=definitions,
+        dut_generics=dut_generics,
+        dut_name=dut_name,
+        clk_connections=clk_connections,
+        connections=connections,
+        clock_names=clock_names,
+        clock_infos=clock_infos,
+        output_path=default_output_path,
+        )
+    return filetestbench
+
+
 def prepare_files(directory, filenames, top_entity, add_double_wrapper=False, use_vunit=True,
-                  dut_directory=None, default_generics=None, default_output_path=None):
+                  dut_directory=None, default_generics=None, default_output_path=None,
+                  clock_domains=None, clock_periods=None, clock_offsets=None):
     '''
     Parses VHDL files, and generates a testbench for `top_entity`.
     Returns a tuple of a list of testbench files, and a dictionary
@@ -170,9 +295,15 @@ def prepare_files(directory, filenames, top_entity, add_double_wrapper=False, us
         os.path.join(config.vhdldir, 'clock.vhd'),
     ]
     # Make file testbench
-    ftb = make_filetestbench(resolved_entity, add_double_wrapper, use_vunit=use_vunit,
-                             default_generics=default_generics,
-                             default_output_path=default_output_path,)
+    if clock_domains and len(clock_domains) > 1:
+        ftb = make_filetestbench_multiple_clocks(
+            resolved_entity, clock_domains, add_double_wrapper, default_generics=default_generics,
+            default_output_path=default_output_path,
+            clock_periods=clock_periods, clock_offsets=clock_offsets)
+    else:
+        ftb = make_filetestbench(resolved_entity, add_double_wrapper, use_vunit=use_vunit,
+                                 default_generics=default_generics,
+                                 default_output_path=default_output_path,)
     ftb_fn = os.path.join(directory, '{}_tb.vhd'.format(
         resolved_entity.identifier))
     with open(ftb_fn, 'w') as f:

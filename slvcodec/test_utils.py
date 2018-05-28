@@ -152,6 +152,9 @@ def register_coretest_with_vunit(vu, test, test_output_directory):
             directory=ftb_directory, filenames=filenames,
             top_entity=test['entity_name'],
             add_double_wrapper=False,
+            clock_domains=test.get('clock_domains', None),
+            clock_periods=test.get('clock_periods', None),
+            clock_offsets=test.get('clock_offsets', None),
             )
         combined_filenames = filenames + generated_fns + generated_wrapper_fns
         register_rawtest_with_vunit(
@@ -181,13 +184,35 @@ def write_input_file(entity, generics, test, output_path, first_line_repeats=0):
     '''
     Generate the input data and write it to a file.
     '''
-    i_data = test.make_input_data()
-    lines = [entity.inputs_to_slv(line, generics=generics) for line in i_data]
-    if first_line_repeats > 0:
-        lines = [lines[0]] * first_line_repeats + lines
-    datainfilename = os.path.join(output_path, 'indata.dat')
-    with open(datainfilename, 'w') as f:
-        f.write('\n'.join(lines))
+    if hasattr(test, 'clock_domains'):
+        # Write an input file for each clock domain.
+        i_datas = test.make_input_data()
+        grouped_ports = entity.group_ports_by_clock_domain(test.clock_domains)
+        assert set(i_datas.keys()) == set(grouped_ports.keys())
+        for clock_name, inputs_and_outputs in grouped_ports.items():
+            inputs, outputs = inputs_and_outputs
+            i_data = i_datas[clock_name]
+            for d in i_data:
+                for p in inputs:
+                    if p.name not in d:
+                        d[p.name] = None
+                assert set(d.keys()) == set([p.name for p in inputs])
+            # Get all the signals matching the domain
+            lines = [entity.inputs_to_slv(line, generics=generics, subset_only=True)
+                     for line in i_data]
+            if first_line_repeats > 0:
+                lines = [lines[0]] * first_line_repeats + lines
+            datainfilename = os.path.join(output_path, 'indata_{}.dat'.format(clock_name))
+            with open(datainfilename, 'w') as f:
+                f.write('\n'.join(lines))
+    else:
+        i_data = test.make_input_data()
+        lines = [entity.inputs_to_slv(line, generics=generics) for line in i_data]
+        if first_line_repeats > 0:
+            lines = [lines[0]] * first_line_repeats + lines
+        datainfilename = os.path.join(output_path, 'indata.dat')
+        with open(datainfilename, 'w') as f:
+            f.write('\n'.join(lines))
     return len(lines)
 
 
@@ -196,21 +221,45 @@ def check_output_file(entity, generics, test, output_path, first_line_repeats=0)
     Read the input data and output data and run the check_output_data
     function to verify that the test passes.
     '''
-    # Read input data
-    datainfilename = os.path.join(output_path, 'indata.dat')
-    with open(datainfilename, 'r') as f:
-        lines = f.readlines()
-    i_data = [entity.inputs_from_slv(line, generics=generics)
-              for line in lines][first_line_repeats:]
-    # Read output dta.
-    dataoutfilename = os.path.join(output_path, 'outdata.dat')
-    with open(dataoutfilename, 'r') as f:
-        lines = f.readlines()
-    o_data = [entity.outputs_from_slv(line, generics=generics)
-              for line in lines][first_line_repeats:]
-    trimmed_o_data = o_data[:len(i_data)]
-    # Check validity.
-    test.check_output_data(i_data, trimmed_o_data)
+    if hasattr(test, 'clock_domains'):
+        i_datas = {}
+        o_datas = {}
+        grouped_ports = entity.group_ports_by_clock_domain(test.clock_domains)
+        for clock_name, inputs_and_outputs in grouped_ports.items():
+            input_ports, output_ports = inputs_and_outputs
+            if input_ports:
+                datainfilename = os.path.join(output_path, 'indata_{}.dat'.format(clock_name))
+                with open(datainfilename, 'r') as f:
+                    lines = f.readlines()
+                i_datas[clock_name] = [
+                    entity.inputs_from_slv(
+                        line, generics=generics, subset=[p.name for p in input_ports])
+                    for line in lines][first_line_repeats:]
+            if output_ports:
+                dataoutfilename = os.path.join(output_path, 'outdata_{}.dat'.format(clock_name))
+                with open(dataoutfilename, 'r') as f:
+                    lines = f.readlines()
+                o_datas[clock_name] = [
+                    entity.outputs_from_slv(
+                        line, generics=generics, subset=[p.name for p in output_ports])
+                    for line in lines][first_line_repeats:][:len(i_datas[clock_name])]
+        test.check_output_data(i_datas, o_datas)
+    else:
+        # Read input data
+        datainfilename = os.path.join(output_path, 'indata.dat')
+        with open(datainfilename, 'r') as f:
+            lines = f.readlines()
+        i_data = [entity.inputs_from_slv(line, generics=generics)
+                  for line in lines][first_line_repeats:]
+        # Read output dta.
+        dataoutfilename = os.path.join(output_path, 'outdata.dat')
+        with open(dataoutfilename, 'r') as f:
+            lines = f.readlines()
+        o_data = [entity.outputs_from_slv(line, generics=generics)
+                  for line in lines][first_line_repeats:]
+        trimmed_o_data = o_data[:len(i_data)]
+        # Check validity.
+        test.check_output_data(i_data, trimmed_o_data)
 
 
 def make_pre_config(test, entity, generics):
