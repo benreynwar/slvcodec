@@ -117,7 +117,7 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
         output_slv_declarations, output_slv_definitions])
     clk_names = [p.name for p in enty.ports.values()
                  if (p.direction == 'in') and (p.name in entity.CLOCK_NAMES)]
-    assert len(clk_names) == 1
+    assert len(clk_names) in (0, 1)
     clk_connections = '\n'.join(['{} => clk,'.format(clk) for clk in clk_names])
     connections = ',\n'.join(['{} => {}.{}'.format(
         p.name, {'in': 'input_data', 'out': 'output_data'}[p.direction], p.name)
