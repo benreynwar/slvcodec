@@ -232,7 +232,7 @@ def make_filetestbench_multiple_clocks(
     use_clauses = make_use_clauses(enty)
     generic_params = make_generic_params(enty, default_generics)
 
-    clock_names = clock_domains.keys()
+    clock_names = list(clock_domains.keys())
     # Combine the input and output record definitions with the slv conversion
     # functions.
     definitions = '\n'.join(definitions)
@@ -252,6 +252,12 @@ def make_filetestbench_multiple_clocks(
         clock_periods = {}
     if clock_offsets is None:
         clock_offsets = {}
+
+    # Check that the first clock has signals.
+    # This is important since this is the file that will determine when the
+    # simulation terminates.
+    assert clock_domains[clock_names[0]]
+
     clock_infos = [(name, clock_periods.get(name, '10 ns'), clock_offsets.get(name, '0 ns'),
                     len(clock_domains[name]) > 0)
                    for name in clock_names]

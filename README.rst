@@ -385,7 +385,7 @@ exeception is the output data is incorrect.
             assert all([d < allowed_error for d in differences])
 
 
-We then use ``slccodec.test_utils.register_test_with_vunit`` to generate an appropriate testbench and input
+We then use ``slvcodec.test_utils.register_test_with_vunit`` to generate an appropriate testbench and input
 data file, and register the produced test with vunit.  VUnit can then be run as normal.
 
 

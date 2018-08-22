@@ -184,7 +184,7 @@ def write_input_file(entity, generics, test, output_path, first_line_repeats=0):
     '''
     Generate the input data and write it to a file.
     '''
-    if hasattr(test, 'clock_domains'):
+    if hasattr(test, 'clock_domains') and test.clock_domains:
         # Write an input file for each clock domain.
         i_datas = test.make_input_data()
         grouped_ports = entity.group_ports_by_clock_domain(test.clock_domains)
@@ -221,7 +221,7 @@ def check_output_file(entity, generics, test, output_path, first_line_repeats=0)
     Read the input data and output data and run the check_output_data
     function to verify that the test passes.
     '''
-    if hasattr(test, 'clock_domains'):
+    if hasattr(test, 'clock_domains') and test.clock_domains:
         i_datas = {}
         o_datas = {}
         grouped_ports = entity.group_ports_by_clock_domain(test.clock_domains)
