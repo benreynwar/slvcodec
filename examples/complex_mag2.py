@@ -18,25 +18,25 @@ class ComplexMag2Test:
         r = f / pow(2, self.fixed_width-2)
         return r
 
-    def make_input_data(self, seed=None, n_data=3000):
+    def make_input_data(self):
         input_data = [{
             'i': {'real': random.randint(self.min_fixed, self.max_fixed),
                   'imag': random.randint(self.min_fixed, self.max_fixed)},
         } for i in range(self.n_data)]
-        
         return input_data
 
     def check_output_data(self, input_data, output_data):
         inputs = [self.fixed_to_float(d['i']['real']) + self.fixed_to_float(d['i']['imag']) * 1j
                   for d in input_data]
-        input_float_mag2s = [abs(v)*abs(v) for v in inputs] 
+        input_float_mag2s = [abs(v)*abs(v) for v in inputs]
         outputs = [self.fixed_to_float(d['o']) for d in output_data]
-        differences = [abs(expected - actual) for expected, actual in zip(input_float_mag2s, outputs)]
+        differences = [abs(expected - actual)
+                       for expected, actual in zip(input_float_mag2s, outputs)]
         allowed_error = 1/pow(2, self.fixed_width-2)
         assert all([d < allowed_error for d in differences])
 
 
-if __name__ == '__main__':
+def run_test():
     random.seed(0)
     # Initialize vunit with command line parameters.
     vu = config.setup_vunit()
@@ -63,3 +63,7 @@ if __name__ == '__main__':
     # Run the tests with VUnit
     vu.set_sim_option('disable_ieee_warnings', True)
     vu.main()
+
+
+if __name__ == '__main__':
+    run_test()

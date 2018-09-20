@@ -70,7 +70,7 @@ def test_vunit_simple_integration():
         top_params={},
         test_class=DummyChecker,
         )
-    all_ok = vu._main()
+    all_ok = vu._main(post_run=None)
     assert all_ok
 
 
@@ -91,7 +91,7 @@ def test_vunit_coretest_integration():
     config.setup_fusesoc(cores_roots=[coresdir])
     vu = config.setup_vunit(argv=['--dont-catch-exceptions'])
     test_utils.register_coretest_with_vunit(vu, coretest, thistestoutput_dir)
-    all_ok = vu._main()
+    all_ok = vu._main(post_run=None)
     assert all_ok
 
 

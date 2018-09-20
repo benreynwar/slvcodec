@@ -42,9 +42,9 @@ def make_record_declarations_and_definitions(record_type):
         name, subtype = name_and_subtype
         indices_names_and_widths.append(
             (index, name, math_parser.str_expression(subtype.width)))
-        definitions = definitions_template.render(
-            type=record_type.identifier,
-            indices_names_and_widths=indices_names_and_widths)
+    definitions = definitions_template.render(
+        type=record_type.identifier,
+        indices_names_and_widths=indices_names_and_widths)
     return declarations, definitions
 
 

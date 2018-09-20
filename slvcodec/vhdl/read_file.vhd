@@ -28,7 +28,9 @@ begin
     variable input_string : string(1 to WIDTH); 
     variable counter: natural := 0;
   begin
-    test_runner_setup(runner, PASSED_RUNNER_CFG);
+    if PASSED_RUNNER_CFG /= "" then
+      test_runner_setup(runner, PASSED_RUNNER_CFG);
+    end if;
 
     textio.file_open(input_file, FILENAME, read_mode);
 
@@ -46,7 +48,9 @@ begin
       wait until rising_edge(clk);
     end loop;  
 
-    test_runner_cleanup(runner);
+    if PASSED_RUNNER_CFG /= "" then
+      test_runner_cleanup(runner);
+    end if;
   end process;
 
 end arch;

@@ -9,7 +9,7 @@ from slvcodec import add_slvcodec_files, filetestbench_generator, test_utils
 
 def from_fusesoc_core(
         directory, corename, entityname, generics, top_params,
-        board_name=None, frequency=None, overwrite_ok=False,
+        board_name=None, frequency=None, frequency_b=None, overwrite_ok=False,
         testbench_type=None,
 ):
     board_params = boards.params[board_name]
@@ -22,8 +22,9 @@ def from_fusesoc_core(
         additional_generator=add_slvcodec_files,
         )
     if testbench_type == 'jtag':
+        frequency_b = 0 if frequency_b is None else frequency_b
         files_and_ip = jtagtestbench_generator.get_files_and_ip(
-            directory, filenames, entityname, generics, board_params, frequency)
+            directory, filenames, entityname, generics, board_params, frequency, frequency_b)
         resolved = {}
         out_of_context = False
     elif testbench_type == 'file':
