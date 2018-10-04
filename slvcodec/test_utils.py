@@ -166,6 +166,10 @@ def register_coretest_with_vunit(vu, test, test_output_directory):
             test_class=test['generator'],
             top_params=top_params,
         )
+    return {
+        'filenames': filenames,
+        'combined_filenames': combined_filenames,
+        }
 
 
 def run_vunit(tests, cores_roots, test_output_directory):
