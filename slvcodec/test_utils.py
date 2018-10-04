@@ -105,7 +105,8 @@ def register_test_with_vunit(
     )
 
 
-def register_coretest_with_vunit(vu, test, test_output_directory):
+def register_coretest_with_vunit(
+        vu, test, test_output_directory, add_double_wrapper=False, default_generics={}):
     '''
     Register a test with vunit.
     Args:
@@ -117,6 +118,9 @@ def register_coretest_with_vunit(vu, test, test_output_directory):
         `top_entity`: The name of the entity to test.
         `generator`: A function that takes (resolved, generics, top_params) and
          returns an object with make_input_data and check_output_data methods.
+      `add_double_wrapper`: Adds wrappers that convert to and from std_logic_vector.
+         Useful if you want the test to also work post-synthesis.
+      `default_generics`: Default values for generics.
     '''
     if 'param_sets' in test:
         param_sets = test['param_sets']
@@ -151,10 +155,11 @@ def register_coretest_with_vunit(vu, test, test_output_directory):
         generated_fns, generated_wrapper_fns, resolved = filetestbench_generator.prepare_files(
             directory=ftb_directory, filenames=filenames,
             top_entity=test['entity_name'],
-            add_double_wrapper=False,
+            add_double_wrapper=add_double_wrapper,
             clock_domains=test.get('clock_domains', None),
             clock_periods=test.get('clock_periods', None),
             clock_offsets=test.get('clock_offsets', None),
+            default_generics=default_generics,
             )
         combined_filenames = filenames + generated_fns + generated_wrapper_fns
         register_rawtest_with_vunit(
