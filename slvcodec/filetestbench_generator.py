@@ -1,12 +1,43 @@
 import logging
 import os
-import re
 
 import jinja2
 
 from slvcodec import entity, typs, package_generator, config, vhdl_parser
 
 logger = logging.getLogger(__name__)
+
+
+def make_generics_wrapper(enty, generics, wrapped_name):
+    generics = generics.copy()
+    for k, v in generics.items():
+        if isinstance(v, str) and (len(v) > 0) and (v[0] != "'"):
+            generics[k] = '"' + v + '"'
+    # Get the list of generic parameters for the testbench.
+    wrapped_generics = ',\n'.join(['{} => {}'.format(g.name, generics[g.name])
+                                   for g in enty.generics.values()])
+    # Generate use clauses required by the testbench.
+    use_clauses = '\n'.join([
+        'use {}.{}.{};'.format(u.library, u.design_unit, u.name_within)
+        for u in enty.uses.values()])
+    use_clauses += '\n' + '\n'.join([
+        'use {}.{}_slvcodec.{};'.format(u.library, u.design_unit, u.name_within)
+        for u in enty.uses.values()
+        if u.library not in ('ieee', 'std') and '_slvcodec' not in u.design_unit])
+    # Read in the template and format it.
+    template_name = 'setgenerics.vhd'
+    template_fn = os.path.join(os.path.dirname(__file__), 'templates', template_name)
+    with open(template_fn, 'r') as f:
+        template = jinja2.Template(f.read())
+    wrapper = template.render(
+        entity_name=enty.identifier,
+        use_clauses=use_clauses,
+        wrapped_generics=wrapped_generics,
+        wrapped_name=enty.identifier,
+        wrapper_name=wrapped_name,
+        ports=list(enty.ports.values()),
+        )
+    return wrapper
 
 
 def make_double_wrapper(enty, default_generics=None):
@@ -299,6 +330,7 @@ def prepare_files(directory, filenames, top_entity, add_double_wrapper=False, us
     tb_fns += [
         os.path.join(config.vhdldir, 'write_file.vhd'),
         os.path.join(config.vhdldir, 'clock.vhd'),
+        os.path.join(config.vhdldir, 'txt_util.vhd'),
     ]
     # Make file testbench
     if clock_domains and len(clock_domains) > 1:
@@ -315,8 +347,10 @@ def prepare_files(directory, filenames, top_entity, add_double_wrapper=False, us
     with open(ftb_fn, 'w') as f:
         f.write(ftb)
     if add_double_wrapper:
-        fromslvcodec_wrapper, toslvcodec_wrapper = make_double_wrapper(resolved_entity, default_generics=default_generics)
-        fromslvcodec_fn = os.path.join(dut_directory, resolved_entity.identifier + '_fromslvcodec.vhd')
+        fromslvcodec_wrapper, toslvcodec_wrapper = make_double_wrapper(
+                resolved_entity, default_generics=default_generics)
+        fromslvcodec_fn = os.path.join(
+                dut_directory, resolved_entity.identifier + '_fromslvcodec.vhd')
         toslvcodec_fn = os.path.join(directory, resolved_entity.identifier + '_toslvcodec.vhd')
         with open(fromslvcodec_fn, 'w') as f:
             f.write(fromslvcodec_wrapper)
@@ -337,18 +371,39 @@ def add_slvcodec_files(directory, filenames):
     Parses files, and generates helper packages for existing packages that
     contain functions to convert types to and from std_logic_vector.
     '''
+    parsed_entities, resolved_packages, filename_to_package_name = process_files(
+        directory, filenames)
+    combined_filenames = add_slvcodec_files_inner(
+        directory, filenames, resolved_packages, filename_to_package_name)
+    return combined_filenames
+
+
+def process_files(directory, filenames, entity_names_to_resolve=None):
+    processed_filenames = set()
     parsed_packages = []
     filename_to_package_name = {}
+    entities_to_resolve = []
     for filename in filenames:
+        if filename in processed_filenames:
+            continue
+        processed_filenames.add(filename)
         new_parsed_entities, new_parsed_packages = vhdl_parser.parse_file(filename)
         parsed_packages += new_parsed_packages
         if new_parsed_packages:
             assert len(new_parsed_packages) == 1
             filename_to_package_name[filename] = new_parsed_packages[0].identifier
-    entities, packages = vhdl_parser.resolve_entities_and_packages(
-        entities=[], packages=parsed_packages)
-    combined_filenames = [os.path.join(config.vhdldir, 'txt_util.vhd'),
-                          os.path.join(config.vhdldir, 'slvcodec.vhd')]
+        if new_parsed_entities:
+            assert len(new_parsed_entities) == 1
+            if ((entity_names_to_resolve is not None) and
+                    (new_parsed_entities[0].identifier in entity_names_to_resolve)):
+                entities_to_resolve += new_parsed_entities
+    resolved_entities, resolved_packages = vhdl_parser.resolve_entities_and_packages(
+        entities=entities_to_resolve, packages=parsed_packages)
+    return resolved_entities, resolved_packages, filename_to_package_name
+
+
+def add_slvcodec_files_inner(directory, filenames, packages, filename_to_package_name):
+    combined_filenames = [os.path.join(config.vhdldir, 'slvcodec.vhd')]
     for fn in filenames:
         if fn not in combined_filenames:
             combined_filenames.append(fn)
@@ -361,3 +416,21 @@ def add_slvcodec_files(directory, filenames):
                 f.write(slvcodec_pkg)
             combined_filenames.append(slvcodec_package_filename)
     return combined_filenames
+
+
+def make_add_slvcodec_files_and_setgenerics_wrapper(old_name, new_name, generics):
+    def add_slvcodec_files_and_setgenerics_wrapper(directory, filenames):
+        parsed_entities, resolved_packages, filename_to_package_name = process_files(
+            directory, filenames)
+        combined_filenames = add_slvcodec_files_inner(
+            directory, filenames, resolved_packages, filename_to_package_name)
+        parsed_entities, resolved_packages, filename_to_package_name = process_files(
+            directory, combined_filenames, entity_names_to_resolve=[old_name])
+        enty = parsed_entities[old_name]
+        setgenerics_wrapper = make_generics_wrapper(enty, generics, new_name)
+        wrapper_filename = os.path.join(directory, 'decoder_top.vhd')
+        with open(wrapper_filename, 'w') as f:
+            f.write(setgenerics_wrapper)
+        combined_filenames.append(wrapper_filename)
+        return combined_filenames
+    return add_slvcodec_files_and_setgenerics_wrapper

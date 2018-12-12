@@ -49,7 +49,7 @@ def uint_to_list_of_uints(uint, size, width):
     [3, 2, 1]
     '''
     if uint is None:
-        output = None
+        output = [None] * size
     else:
         assert uint >= 0
         residual = uint
