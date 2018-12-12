@@ -68,7 +68,7 @@ def resolve_packages(packages):
     Returns a dictionary of resolved packages.
     '''
     package_dict = dict([(p.identifier, p) for p in packages])
-    resolved_pd = BUILTIN_PACKAGES
+    resolved_pd = BUILTIN_PACKAGES.copy()
     resolved_package_names = list(STANDARD_PACKAGES)
     toresolve_package_names = [p.identifier for p in packages]
     while toresolve_package_names:

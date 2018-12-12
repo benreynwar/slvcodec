@@ -18,6 +18,7 @@ def logceil(argument):
     Returns the number of bits necessary to represent an integer that has
     values in the range from 0 to (`argument`-1).
     The logceil(0) is defined to be 1.
+    The logceil(1) is defined to be 1.
 
     >>> logceil(0)
     1
@@ -35,9 +36,35 @@ def logceil(argument):
     return value
 
 
+def logceil_1to0(argument):
+    '''
+    Returns the number of bits necessary to represent an integer that has
+    values in the range from 0 to (`argument`-1).
+    The logceil(0) is defined to be 0.
+    The logceil(1) is defined to be 0.
+
+    >>> logceil_1to0(0)
+    0
+    >>> logceil_1to0(1)
+    0
+    >>> logceil_1to0(2)
+    1
+    >>> logceil_1to0(4)
+    2
+    >>> logceil_1to0(7)
+    3
+    '''
+    if argument < 2:
+        value = 0
+    else:
+        value = int(math.ceil(math.log(argument)/math.log(2)))
+    return value
+
+
 # These are the default functions that can be parsed from the VHDL.
 REGISTERED_FUNCTIONS = {
     'logceil': logceil,
+    'logceil_1to0': logceil_1to0,
     'clog2': logceil,
     'slvcodec_logceil': logceil,
     'real': lambda x: x,
