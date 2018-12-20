@@ -8,10 +8,10 @@ from slvcodec import entity, typs, package_generator, config, vhdl_parser
 logger = logging.getLogger(__name__)
 
 
-def make_generics_wrapper(enty, generics, wrapped_name):
+def make_generics_wrapper(enty, generics, wrapped_name, ports_to_remove=None):
     generics = generics.copy()
     for k, v in generics.items():
-        if isinstance(v, str) and (len(v) > 0) and (v[0] != "'"):
+        if isinstance(v, str) and (len(v) > 0) and (v[0] not in  ("'", '"')):
             generics[k] = '"' + v + '"'
     # Get the list of generic parameters for the testbench.
     wrapped_generics = ',\n'.join(['{} => {}'.format(g.name, generics[g.name])
@@ -35,7 +35,8 @@ def make_generics_wrapper(enty, generics, wrapped_name):
         wrapped_generics=wrapped_generics,
         wrapped_name=enty.identifier,
         wrapper_name=wrapped_name,
-        ports=list(enty.ports.values()),
+        wrapped_ports=list(enty.ports.values()),
+        wrapper_ports=list([e for e in enty.ports.values() if e.name not in ports_to_remove]),
         )
     return wrapper
 
@@ -418,7 +419,7 @@ def add_slvcodec_files_inner(directory, filenames, packages, filename_to_package
     return combined_filenames
 
 
-def make_add_slvcodec_files_and_setgenerics_wrapper(old_name, new_name, generics):
+def make_add_slvcodec_files_and_setgenerics_wrapper(old_name, new_name, generics, ports_to_remove=None):
     def add_slvcodec_files_and_setgenerics_wrapper(directory, filenames):
         parsed_entities, resolved_packages, filename_to_package_name = process_files(
             directory, filenames)
@@ -427,7 +428,7 @@ def make_add_slvcodec_files_and_setgenerics_wrapper(old_name, new_name, generics
         parsed_entities, resolved_packages, filename_to_package_name = process_files(
             directory, combined_filenames, entity_names_to_resolve=[old_name])
         enty = parsed_entities[old_name]
-        setgenerics_wrapper = make_generics_wrapper(enty, generics, new_name)
+        setgenerics_wrapper = make_generics_wrapper(enty, generics, new_name, ports_to_remove)
         wrapper_filename = os.path.join(directory, 'decoder_top.vhd')
         with open(wrapper_filename, 'w') as f:
             f.write(setgenerics_wrapper)
