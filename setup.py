@@ -26,6 +26,6 @@ setup(
     dependency_links=[
         'git+https://github.com/benreynwar/fusesoc_generators@1632aaf22016667912dfa77d6999501414b39600#egg=fusesoc_generators-0.0.0',
         'git+https://github.com/benreynwar/pyvivado@680364d2fbd04679ef06ea229702e0e6e5394af3#egg=pyvivado-0.0.0',
-        'git+https://github.com/benreynwar/axilent@963c6824f2fdbd2a3beaef2682fb7461ddcb5a86#egg=axilent-0.0.0',
+        'git+https://github.com/benreynwar/axilent@963c6824f2fdbd2a3beaef2682fb7461ddcb5a86#egg=axilent-0.1.2',
     ],
 )
