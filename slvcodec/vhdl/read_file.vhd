@@ -15,11 +15,12 @@ entity ReadFile is
            PASSED_RUNNER_CFG: string;
            WIDTH: positive);
   port (clk: in std_logic;
+        endsim: in std_logic;
         out_data: out std_logic_vector(0 to WIDTH-1));
 end ReadFile;
 
 architecture arch of ReadFile is
-  file input_file : textio.text;
+  file input_file: textio.text;
   signal the_out_data: std_logic_vector(0 to WIDTH-1) := (others => '0');
 begin
   out_data <= the_out_data;
@@ -39,6 +40,7 @@ begin
       textio.readline(input_file, input_line);
       textio.read(input_line, input_string);
       the_out_data <= to_std_logic_vector(input_string);
+      assert input_line'length = 0 report "Unexpected line length in input file." severity failure;
     end loop;
 
     textio.file_close(input_file);

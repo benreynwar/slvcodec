@@ -11,6 +11,7 @@ entity WriteFile is
   generic (FILENAME: string;
            WIDTH: positive);
   port (clk: in std_logic;
+        endsim: in std_logic;
         in_data: in std_logic_vector(0 to WIDTH-1));
 end WriteFile;
 
@@ -21,14 +22,16 @@ begin
     variable output_line : textio.line;
   begin
 
-    textio.file_open(output_file, FILENAME, write_mode);
-
     while true loop
-      wait until rising_edge(clk);
-      print(output_file, str(in_data));
+      if endsim /= '1' then
+        wait until rising_edge(clk);
+        textio.file_open(output_file, FILENAME, append_mode);
+        print(output_file, str(in_data));
+        textio.file_close(output_file);
+      else
+        wait;
+      end if;
     end loop;
-
-    textio.file_close(output_file);
 
     wait;
   end process;

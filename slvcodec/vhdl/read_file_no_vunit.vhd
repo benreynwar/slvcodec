@@ -11,6 +11,7 @@ entity ReadFile is
   generic (FILENAME: string;
            WIDTH: positive);
   port (clk: in std_logic;
+        endsim: out std_logic := '0';
         out_data: out std_logic_vector(0 to WIDTH-1));
 end ReadFile;
 
@@ -24,6 +25,9 @@ begin
     variable input_string : string(1 to WIDTH); 
     variable counter: natural := 0;
   begin
+
+    endsim <= '0';
+    
     textio.file_open(input_file, FILENAME, read_mode);
 
     while not textio.endfile(input_file) loop
@@ -39,6 +43,9 @@ begin
       counter := counter + 1;
       wait until rising_edge(clk);
     end loop;  
+
+    endsim <= '1';
+    wait;
 
   end process;
 

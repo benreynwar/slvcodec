@@ -7,18 +7,24 @@ entity ClockGenerator is
   generic (CLOCK_PERIOD: Time;
            CLOCK_OFFSET: Time
            );
-  port (clk: out std_logic := '0');
+  port (clk: out std_logic := '0';
+        endsim: in std_logic
+        );
 end ClockGenerator;
 
 architecture arch of ClockGenerator is
 begin
   clock_process: process
   begin
-    wait for CLOCK_OFFSET;
-    clk <= '0';
-    wait for CLOCK_PERIOD/2;
-    clk <= '1';
-    wait for CLOCK_PERIOD/2-CLOCK_OFFSET;
-    clk <= '0';
+    if endsim /= '1' then
+      wait for CLOCK_OFFSET;
+      clk <= '0';
+      wait for CLOCK_PERIOD/2;
+      clk <= '1';
+      wait for CLOCK_PERIOD/2-CLOCK_OFFSET;
+      clk <= '0';
+    else
+      wait;
+    end if;
   end process;      
 end arch;

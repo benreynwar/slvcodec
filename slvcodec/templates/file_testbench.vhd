@@ -21,6 +21,7 @@ architecture arch of {{test_name}} is
   signal clk: std_logic;
   signal read_clk: std_logic;
   signal write_clk: std_logic;
+  signal endsim: std_logic;
 begin
 
   input_data <= from_slvcodec(input_slv);
@@ -31,31 +32,33 @@ begin
                 PASSED_RUNNER_CFG => RUNNER_CFG,
                 WIDTH => t_input_slvcodecwidth)
     port map(clk => read_clk,
+             endsim => endsim,
              out_data => input_slv);
 
   file_writer: entity work.WriteFile
     generic map(FILENAME => OUTPUT_PATH & "/outdata.dat",
                 WIDTH => t_output_slvcodecwidth)
     port map(clk => write_clk,
+             endsim => endsim,
              in_data => output_slv);
 
   clock_generator: entity work.ClockGenerator
     generic map(CLOCK_PERIOD => CLOCK_PERIOD,
                 CLOCK_OFFSET => 0 ns
                 )
-    port map(clk => clk);
+    port map(clk => clk, endsim => endsim);
 
   read_clock_generator: entity work.ClockGenerator
     generic map(CLOCK_PERIOD => CLOCK_PERIOD,
                 CLOCK_OFFSET => CLOCK_PERIOD/10
                 )
-    port map(clk => read_clk);
+    port map(clk => read_clk, endsim => endsim);
 
   write_clock_generator: entity work.ClockGenerator
     generic map(CLOCK_PERIOD => CLOCK_PERIOD,
                 CLOCK_OFFSET => 4*CLOCK_PERIOD/10
                 )
-    port map(clk => write_clk);
+    port map(clk => write_clk, endsim => endsim);
 
   dut: entity work.{{dut_name}}{% if dut_generics %}
     generic map(
