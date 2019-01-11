@@ -21,7 +21,7 @@ setup(
         'fusesoc_generators',
         'pyvivado',
         'vunit-hdl',
-        'axilent==0.0.0',
+        'axilent>=0.1.1',
     ],
     dependency_links=[
         'git+https://github.com/benreynwar/fusesoc_generators@1632aaf22016667912dfa77d6999501414b39600#egg=fusesoc_generators-0.0.0',
