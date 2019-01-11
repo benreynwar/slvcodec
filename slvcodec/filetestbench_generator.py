@@ -324,14 +324,15 @@ def prepare_files(directory, filenames, top_entity, add_double_wrapper=False, us
         dut_directory = directory
     entities, packages = vhdl_parser.parse_and_resolve_files(filenames)
     resolved_entity = entities[top_entity]
+    tb_fns = []
+    tb_fns.append(os.path.join(config.vhdldir, 'txt_util.vhd'))
     if use_vunit:
-        tb_fns = [os.path.join(config.vhdldir, 'read_file.vhd')]
+        tb_fns.append(os.path.join(config.vhdldir, 'read_file.vhd'))
     else:
-        tb_fns = [os.path.join(config.vhdldir, 'read_file_no_vunit.vhd')]
+        tb_fns.append(os.path.join(config.vhdldir, 'read_file_no_vunit.vhd'))
     tb_fns += [
         os.path.join(config.vhdldir, 'write_file.vhd'),
         os.path.join(config.vhdldir, 'clock.vhd'),
-        os.path.join(config.vhdldir, 'txt_util.vhd'),
     ]
     # Make file testbench
     if clock_domains and len(clock_domains) > 1:
@@ -358,6 +359,7 @@ def prepare_files(directory, filenames, top_entity, add_double_wrapper=False, us
             dut_fns.append(fromslvcodec_fn)
         with open(toslvcodec_fn, 'w') as f:
             f.write(toslvcodec_wrapper)
+            tb_fns.append(os.path.join(config.vhdldir, 'slvcodec.vhd'))
             tb_fns.append(toslvcodec_fn)
     tb_fns.append(ftb_fn)
     resolved = {
