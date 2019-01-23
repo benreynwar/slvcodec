@@ -19,8 +19,8 @@ setup(
         'jinja2>=2.8',
         'pytest',
         'fusesoc_generators @ git+https://github.com/benreynwar/fusesoc_generators@1632aaf22016667912dfa77d6999501414b39600',
-        'pyvivado @ git+https://github.com/benreynwar/pyvivado@680364d2fbd04679ef06ea229702e0e6e5394af3',
+        'pyvivado @ git+https://github.com/benreynwar/pyvivado@fa7cf66713436a2b7e65d63117a94676471f26ce',
         'vunit-hdl',
-        'axilent @ git+https://github.com/benreynwar/axilent@963c6824f2fdbd2a3beaef2682fb7461ddcb5a86',
+        'axilent @ git+https://github.com/benreynwar/axilent@9435dbd8369aafca4a7737fcb1d3d64d3fb2d753',
     ],
 )
