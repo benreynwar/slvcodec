@@ -3,8 +3,6 @@ import os
 
 from vunit import VUnitCLI, VUnit
 
-import fusesoc_generators
-
 basedir = os.path.abspath(os.path.dirname(__file__))
 vhdldir = os.path.join(basedir, 'vhdl')
 
@@ -49,4 +47,5 @@ def setup_fusesoc(cores_roots):
     '''
     Prepares fusesoc by specifying where core files are located.
     '''
+    import fusesoc_generators
     fusesoc_generators.add_cores_roots(cores_roots)
