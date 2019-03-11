@@ -10,6 +10,7 @@ entity {{wrapper_name}} is
 end entity;
  
 architecture arch of {{wrapper_name}} is
+  {{ for_arch_header }}
   {% for port in wrapped_ports %}signal {{port.name}}_typed: {{port.typ}};
   {% endfor %}
 begin
@@ -21,8 +22,10 @@ begin
     generic map(
       {{wrapped_generics}}
       ){% endif %}
-    port map({% for port in wrapped_ports%}
-      {{port.name}} => {% if port in wrapper_ports %}{{port.name}}_typed{% else %}{% if port.typ.__str__() == "std_logic"%}'0'{% else %}(others => '0'){% endif %}{% endif %}{% if not loop.last %},{% endif %}{% endfor %}
+    port map({% for port in wrapped_ports%}{% if port in wrapper_ports %}
+      {{port.name}} => {{port.name}}_typed{% if not loop.last %},{% endif %}{% else %}{% if port.direction == "in" %}{% if port.typ.__str__() == "std_logic"%}
+      {{port.name}} => '0'{% else %}
+      {{port.name}} => (others => '0'){% endif %}{% if not loop.last %},{% endif %}{% endif %}{% endif %}{% endfor %}
       );
  
 end architecture;
