@@ -23,6 +23,7 @@ architecture arch of {{test_name}} is
   signal {{clock_name}}_read_clk: std_logic;
   signal {{clock_name}}_write_clk: std_logic;{% endif %}
   {% endfor %}
+  signal endsim: std_logic;
 begin
   {% for clock_name, clock_period, clock_offset, any_signals in clock_infos %}
   {% if any_signals %}
@@ -34,32 +35,34 @@ begin
                 PASSED_RUNNER_CFG => {% if loop.index == 1 %}RUNNER_CFG{% else %}""{% endif %},
                 WIDTH => t_{{clock_name}}_inputs_slvcodecwidth)
     port map(clk => {{clock_name}}_read_clk,
+             endsim => endsim,
              out_data => {{clock_name}}_input_slv);
 
   file_writer_{{clock_name}}: entity work.WriteFile
     generic map(FILENAME => OUTPUT_PATH & "/outdata_{{clock_name}}.dat",
                 WIDTH => t_{{clock_name}}_outputs_slvcodecwidth)
     port map(clk => {{clock_name}}_write_clk,
+             endsim => endsim,
              in_data => {{clock_name}}_output_slv);
 
   read_clock_generator_{{clock_name}}: entity work.ClockGenerator
     generic map(CLOCK_PERIOD => {{clock_name}}_PERIOD,
                 CLOCK_OFFSET => {{clock_name}}_OFFSET+{{clock_name}}_PERIOD/10
                 )
-    port map(clk => {{clock_name}}_read_clk);
+    port map(clk => {{clock_name}}_read_clk, endsim => endsim);
 
   write_clock_generator_{{clock_name}}: entity work.ClockGenerator
     generic map(CLOCK_PERIOD => {{clock_name}}_PERIOD,
                 CLOCK_OFFSET => {{clock_name}}_OFFSET+4*{{clock_name}}_PERIOD/10
                 )
-    port map(clk => {{clock_name}}_write_clk);
+    port map(clk => {{clock_name}}_write_clk, endsim => endsim);
   {% endif %}
 
   clock_generator_{{clock_name}}: entity work.ClockGenerator
     generic map(CLOCK_PERIOD => {{clock_name}}_PERIOD,
                 CLOCK_OFFSET => {{clock_name}}_OFFSET
                 )
-    port map(clk => {{clock_name}}_clk);
+    port map(clk => {{clock_name}}_clk, endsim => endsim);
   {% endfor %}
 
   dut: entity work.{{dut_name}}{% if dut_generics %}
