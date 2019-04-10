@@ -235,8 +235,12 @@ class ConstrainedArray:
 
     def reduce_slv(self, slv, generics):
         width = int(apply_generics(generics, self.width))
-        these_slv = slv[-width:]
-        reduced_slv = slv[:-width]
+        if width == 0:
+            these_slv = slv[:0]
+            reduced_slv = slv[0:]
+        else:
+            these_slv = slv[-width:]
+            reduced_slv = slv[:-width]
         data = self.from_slv(these_slv, generics)
         return data, reduced_slv
 
@@ -389,8 +393,12 @@ class ConstrainedStdLogicVector:
 
     def reduce_slv(self, slv, generics):
         width = int(apply_generics(generics, self.width))
-        these_slv = slv[-width:]
-        reduced_slv = slv[:-width]
+        if width == 0:
+            these_slv = slv[:0]
+            reduced_slv = slv[0:]
+        else:
+            these_slv = slv[-width:]
+            reduced_slv = slv[:-width]
         data = self.from_slv(these_slv, generics)
         return data, reduced_slv
 
