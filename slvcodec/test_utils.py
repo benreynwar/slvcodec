@@ -9,7 +9,6 @@ import itertools
 import logging
 import random
 
-import fusesoc_generators
 from slvcodec import add_slvcodec_files
 from slvcodec import filetestbench_generator
 from slvcodec import config
@@ -122,6 +121,9 @@ def register_coretest_with_vunit(
          Useful if you want the test to also work post-synthesis.
       `default_generics`: Default values for generics.
     '''
+    # Put this import here so we only need it if necessary.
+    # FIXME: Remove fusesoc generators requirement here.
+    import fusesoc_generators
     if 'param_sets' in test:
         param_sets = test['param_sets']
     elif 'all_generics' in test:
