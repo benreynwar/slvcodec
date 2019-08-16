@@ -214,9 +214,13 @@ class ConstrainedArray:
                    ))
 
     def __str__(self):
-        s = '{}({}-1 downto 0)'.format(
-            self.unconstrained_type.identifier, math_parser.str_expression(
-                self.size))
+        if self.identifier is None:
+            assert self.unconstrained_type.identifier is not None
+            s = '{}({}-1 downto 0)'.format(
+                self.unconstrained_type.identifier, math_parser.str_expression(
+                    self.size))
+        else:
+            s = self.identifier
         return s
 
     def to_slv(self, data, generics):
