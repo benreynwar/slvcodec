@@ -420,8 +420,8 @@ def run_pipe_test(directory, filenames, top_entity, generics, test_generator, cl
     input_data = test.make_input_data()
 
     entity = resolved['entities'][top_entity]
-    in_handle =  open(os.path.join(directory, f'indata_{clk_name}.dat'), 'w')
-    out_handle = open(os.path.join(directory, f'outdata_{clk_name}.dat'))
+    in_handle =  open(os.path.join(directory, 'indata_{}.dat'.format(clk_name)), 'w')
+    out_handle = open(os.path.join(directory, 'outdata_{}.dat'.format(clk_name)))
     out_width = entity.output_width(generics)
     output_data = []
     for ipt in input_data:
