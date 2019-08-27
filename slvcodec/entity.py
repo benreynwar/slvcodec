@@ -134,6 +134,22 @@ class Entity(object):
             if (port.direction == 'in') and (port.name not in CLOCK_NAMES)])
         return input_ports
 
+    def output_ports(self):
+        '''
+        Get an ordered dictionary of the input ports.
+        '''
+        output_ports = collections.OrderedDict([
+            (port_name, port) for port_name, port in self.ports.items()
+            if (port.direction == 'out')])
+        return output_ports
+
+    def output_width(self, generics):
+        width = 0
+        for port in self.output_ports().values():
+            width_symbol = typs.make_substitute_generics_function(generics)(port.typ.width)
+            width += math_parser.get_value(width_symbol)
+        return width
+
     def group_ports_by_clock_domain(self, clock_domains):
         '''
         `clock_domains` is a dictionary associating a clock name, with a list of regex patterns

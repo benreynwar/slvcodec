@@ -8,6 +8,7 @@ import shutil
 import itertools
 import logging
 import random
+import subprocess
 
 from slvcodec import add_slvcodec_files
 from slvcodec import filetestbench_generator
@@ -376,3 +377,71 @@ def split_data(is_splits, data, include_initial=False):
     if this_data:
         split_datas.append(this_data)
     return split_datas
+
+
+def run_pipe_test(directory, filenames, top_entity, generics, test_generator, clk_name='clk'):
+    clock_domains = {clk_name: ['.*']}
+    generation_directory = os.path.join(directory, 'generated')
+    os.makedirs(generation_directory)
+    ftb_directory = os.path.join(directory, 'ftb')
+    os.makedirs(ftb_directory)
+
+    top_testbench = top_entity + '_tb'
+    top_params = {}
+
+    with_slvcodec_files = add_slvcodec_files(directory, filenames)
+    generated_fns, generated_wrapper_fns, resolved = filetestbench_generator.prepare_files(
+        directory=ftb_directory, filenames=with_slvcodec_files,
+        top_entity=top_entity, use_pipes=True, use_vunit=False,
+        clock_domains=clock_domains, default_generics=generics,
+    )
+    combined_filenames = with_slvcodec_files + generated_fns + generated_wrapper_fns
+
+    os.mkfifo(os.path.join(directory, 'indata_{}.dat'.format(clk_name)))
+    os.mkfifo(os.path.join(directory, 'outdata_{}.dat'.format(clk_name)))
+
+    # Run the test bench with ghw
+    pwd = os.getcwd()
+    os.chdir(directory)
+    analyzed = []
+    for filename in combined_filenames:
+        if filename not in analyzed:
+            subprocess.call(['ghdl', '-a', '--std=08', filename])
+            analyzed.append(filename)
+    cmd = ['ghdl', '-r', '--std=08', top_testbench]
+    dump_wave = False
+    if dump_wave:
+        cmd.append('--wave=wave.ghw')
+    cmd += ['-gPIPE_PATH=' + directory]
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    os.chdir(pwd)
+
+    test = test_generator(resolved, generics, top_params)
+    input_data = test.make_input_data()
+
+    entity = resolved['entities'][top_entity]
+    in_handle =  open(os.path.join(directory, f'indata_{clk_name}.dat'), 'w')
+    out_handle = open(os.path.join(directory, f'outdata_{clk_name}.dat'))
+    out_width = entity.output_width(generics)
+    output_data = []
+    for ipt in input_data:
+        input_slv = entity.inputs_to_slv(ipt, generics=generics, subset_only=False)
+        in_handle.write(input_slv + '\n')
+        in_handle.flush()
+
+        output_slv = ''
+        length_required = out_width+1
+        count = 0
+        while length_required > 0:
+            new_slv = out_handle.read(length_required)
+            length_required -= len(new_slv)
+            output_slv += new_slv
+            count += 1
+            if count > 10:
+                assert False
+        assert output_slv[-1] == '\n'
+        opt = entity.outputs_from_slv(output_slv, generics=generics)
+        output_data.append(opt)
+    out_handle.close()
+    in_handle.close()
+    test.check_output_data(input_data, output_data)
