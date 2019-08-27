@@ -1,8 +1,6 @@
 import shutil
 import os
 
-import fusesoc_generators
-from pyvivado import base_project, vivado_project, boards, jtagtestbench_generator
 
 from slvcodec import add_slvcodec_files, filetestbench_generator, test_utils
 
@@ -13,6 +11,11 @@ def from_fusesoc_core(
         testbench_type=None,
 ):
     board_params = boards.params[board_name]
+
+    # Put imports inside so they don't cause problems unless this is needed.
+    import fusesoc_generators
+    from pyvivado import base_project, vivado_project, boards, jtagtestbench_generator
+
     filenames = fusesoc_generators.get_filenames_from_core(
         work_root=directory,
         top_core_name=corename,

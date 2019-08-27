@@ -3,6 +3,8 @@ import random
 import shutil
 import logging
 
+import pytest
+
 from slvcodec import test_utils, config
 
 this_dir = os.path.abspath(os.path.dirname(__file__))
@@ -75,6 +77,7 @@ def test_vunit_simple_integration():
 
 
 def test_vunit_coretest_integration():
+    fusesoc_generators = pytest.importorskip('fusesoc_generators')
     thistestoutput_dir = os.path.join(testoutput_dir, 'coretest_integration')
     if os.path.exists(thistestoutput_dir):
         shutil.rmtree(thistestoutput_dir)
