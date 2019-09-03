@@ -22,14 +22,6 @@ architecture arch of {{test_name}} is
   signal {{clock_name}}_read_clk: std_logic;
   signal {{clock_name}}_write_clk: std_logic;{% endif %}
   {% endfor %}
-  function blah return integer is
-  begin
-    report "t_clk_outputs_slvcodecwidth is " & integer'image(t_clk_outputs_slvcodecwidth) severity note;
-    report "width is " & integer'image(width) severity note;
-    report "length is " & integer'image(length) severity note;
-    return 1;
-  end function;
-  constant blah_blah: integer := blah;
 begin
   {% for clock_name, clock_period, clock_offset, any_signals in clock_infos %}
   {% if any_signals %}

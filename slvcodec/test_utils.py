@@ -9,6 +9,7 @@ import itertools
 import logging
 import random
 import subprocess
+import collections
 
 from slvcodec import add_slvcodec_files
 from slvcodec import filetestbench_generator
@@ -400,48 +401,188 @@ def run_pipe_test(directory, filenames, top_entity, generics, test_generator, cl
     os.mkfifo(os.path.join(directory, 'indata_{}.dat'.format(clk_name)))
     os.mkfifo(os.path.join(directory, 'outdata_{}.dat'.format(clk_name)))
 
-    # Run the test bench with ghw
+    process = start_ghdl_process(directory, combined_filenames, top_testbench)
+
+    entity = resolved['entities'][top_entity]
+    in_handle = open(os.path.join(directory, 'indata_{}.dat'.format(clk_name)), 'w')
+    out_handle = open(os.path.join(directory, 'outdata_{}.dat'.format(clk_name)))
+    out_width = entity.output_width(generics)
+    opt = None
+    while True:
+        try:
+            ipt = test_generator.send(opt)
+        except StopIteration:
+            break
+        input_slv = entity.inputs_to_slv(ipt, generics=generics, subset_only=False)
+        in_handle.write(input_slv + '\n')
+        in_handle.flush()
+        length_required = out_width+1
+        output_slv = out_handle.read(length_required)
+        assert len(output_slv) == length_required
+        assert output_slv[-1] == '\n'
+        opt = entity.outputs_from_slv(output_slv, generics=generics)
+    out_handle.close()
+    in_handle.close()
+
+
+def start_ghdl_process(directory, filenames, testbench_name):
     pwd = os.getcwd()
     os.chdir(directory)
     analyzed = []
-    for filename in combined_filenames:
+    for filename in filenames:
         if filename not in analyzed:
             subprocess.call(['ghdl', '-a', '--std=08', filename])
             analyzed.append(filename)
-    cmd = ['ghdl', '-r', '--std=08', top_testbench]
+    cmd = ['ghdl', '-r', '--std=08', testbench_name]
     dump_wave = False
     if dump_wave:
         cmd.append('--wave=wave.ghw')
     cmd += ['-gPIPE_PATH=' + directory]
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     os.chdir(pwd)
+    return process
 
-    test = test_generator(resolved, generics, top_params)
-    input_data = test.make_input_data()
+
+class GeneratorWithCondition:
+
+    def __init__(self, generator):
+        self.generator = generator
+        self.condition = True
+        self.active = True
+
+    def run(self):
+        if self.condition:
+            try:
+                logger.debug('Calling next on {}'.format(self.generator))
+                self.condition = next(self.generator)
+            except StopIteration:
+                logger.debug('A generator is not longer active.')
+                self.active = False
+                self.condition = False
+
+
+class TriggerOnCycle:
+
+    def __init__(self, dut, clk_name=None, cycles_to_wait=1):
+        self.dut = dut
+        if clk_name is None:
+            clk_name = self.dut.get_clk_name()
+        self.clk_name = clk_name
+        self.trigger_index = self.dut.indices[clk_name] + cycles_to_wait
+
+    def __bool__(self):
+        index = self.dut.indices[self.clk_name]
+        assert index <= self.trigger_index
+        result = index == self.trigger_index
+        logger.debug('Trigger on cycle is {}'.format(result))
+        return result
+
+
+class TriggerOnFuture:
+
+    def __init__(self, future):
+        self.future = future
+
+    def __bool__(self):
+        result = self.future.state != self.future.UNRESOLVED
+        logger.debug('Trigger on future is {}'.format(result))
+        return result
+
+
+class DutInterface:
+
+    def __init__(self, resolved, generators):
+        self.resolved = resolved
+        self.indices = {
+            'clk': 0,
+            }
+        self.inputs = {
+            'clk': {},
+            }
+        self.outputs = {
+            'clk': {},
+            }
+        self.generators = generators
+
+    def get_clk_name(self):
+        return 'clk'
+
+    def set_inputs(self, inputs, clk_name=None):
+        if clk_name is None:
+            clk_name = self.get_clk_name()
+        self.inputs[clk_name] = inputs
+
+    def get_inputs(self, clk_name):
+        return self.inputs[clk_name]
+
+    def set_outputs(self, outputs, clk_name):
+        self.outputs[clk_name] = outputs
+
+    def get_outputs(self, clk_name=None):
+        if clk_name is None:
+            clk_name = self.get_clk_name()
+        return self.outputs[clk_name]
+
+    def fork(self, generator):
+        self.generators.append(GeneratorWithCondition(generator))
+
+
+def run_pipe_test2(directory, filenames, top_entity, generics, test_generators, clk_name='clk'):
+    # 1) Parse the files.
+    # 2) Generate a test bench
+    clock_domains = {clk_name: ['.*']}
+    generation_directory = os.path.join(directory, 'generated')
+    os.makedirs(generation_directory)
+    ftb_directory = os.path.join(directory, 'ftb')
+    os.makedirs(ftb_directory)
+
+    top_testbench = top_entity + '_tb'
+    top_params = {}
+
+    with_slvcodec_files = add_slvcodec_files(directory, filenames)
+    generated_fns, generated_wrapper_fns, resolved = filetestbench_generator.prepare_files(
+        directory=ftb_directory, filenames=with_slvcodec_files,
+        top_entity=top_entity, use_pipes=True, use_vunit=False,
+        clock_domains=clock_domains, default_generics=generics,
+    )
+    combined_filenames = with_slvcodec_files + generated_fns + generated_wrapper_fns
+
+    os.mkfifo(os.path.join(directory, 'indata_{}.dat'.format(clk_name)))
+    os.mkfifo(os.path.join(directory, 'outdata_{}.dat'.format(clk_name)))
+    process = start_ghdl_process(directory, combined_filenames, top_testbench)
 
     entity = resolved['entities'][top_entity]
-    in_handle =  open(os.path.join(directory, 'indata_{}.dat'.format(clk_name)), 'w')
+    in_handle = open(os.path.join(directory, 'indata_{}.dat'.format(clk_name)), 'w')
     out_handle = open(os.path.join(directory, 'outdata_{}.dat'.format(clk_name)))
     out_width = entity.output_width(generics)
-    output_data = []
-    for ipt in input_data:
-        input_slv = entity.inputs_to_slv(ipt, generics=generics, subset_only=False)
+
+    # 3) Start the test bench running.
+    generators = []
+    dut = DutInterface(resolved, generators)
+    logger.info('Initial generator call')
+    for generator in test_generators:
+        generators.append(GeneratorWithCondition(generator(dut)))
+    logger.info('Initial generator call done')
+    while True:
+        logger.debug('Running all the {} generators.'.format(len(generators)))
+        while any(generator.condition for generator in generators):
+            for generator in generators:
+                generator.run()
+        if not all(generator.active for generator in generators):
+            break
+        generators = [generator for generator in generators if generator.active]
+        clk_name = 'clk'
+        logger.debug('Writing the input data.')
+        input_slv = entity.inputs_to_slv(
+            dut.get_inputs(clk_name), generics=generics, subset_only=False)
         in_handle.write(input_slv + '\n')
         in_handle.flush()
-
-        output_slv = ''
+        logger.debug('Reading the output data.')
         length_required = out_width+1
-        count = 0
-        while length_required > 0:
-            new_slv = out_handle.read(length_required)
-            length_required -= len(new_slv)
-            output_slv += new_slv
-            count += 1
-            if count > 10:
-                assert False
+        output_slv = out_handle.read(length_required)
+        assert len(output_slv) == length_required
         assert output_slv[-1] == '\n'
-        opt = entity.outputs_from_slv(output_slv, generics=generics)
-        output_data.append(opt)
+        dut.set_outputs(entity.outputs_from_slv(output_slv, generics=generics), clk_name)
+        dut.indices[clk_name] += 1
     out_handle.close()
     in_handle.close()
-    test.check_output_data(input_data, output_data)
