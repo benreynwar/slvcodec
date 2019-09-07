@@ -7,7 +7,7 @@ import select
 
 from slvcodec import add_slvcodec_files
 from slvcodec import filetestbench_generator
-from slvcodec import config
+from slvcodec import config, typs
 
 
 logger = logging.getLogger(__name__)
@@ -74,7 +74,7 @@ class Simulator:
 
         self.clk_name = clk_name
         self.generics = generics
-        self.dut = DutInterface(resolved)
+        self.dut = DutInterface(resolved, top_entity, ignored_ports=['clk'])
 
     def log(self):
         logger.debug('Starting ghdl logging')
@@ -88,7 +88,7 @@ class Simulator:
 
     def step(self):
         input_slv = self.entity.inputs_to_slv(
-            self.dut.get_inputs(self.clk_name), generics=self.generics, subset_only=False)
+            self.dut.get_inputs(), generics=self.generics, subset_only=False)
         self.in_handle.write(input_slv + '\n')
         self.in_handle.flush()
         length_required = self.out_width+1
@@ -97,7 +97,7 @@ class Simulator:
         logger.debug('Succeeded reading')
         assert len(output_slv) == length_required
         assert output_slv[-1] == '\n'
-        self.dut.set_outputs(self.entity.outputs_from_slv(output_slv, generics=self.generics), self.clk_name)
+        self.dut.set_from_simulation(self.entity.outputs_from_slv(output_slv, generics=self.generics))
         self.log()
 
     def __del__(self):
@@ -106,38 +106,169 @@ class Simulator:
         self.in_handle.close()
 
 
-class DutInterface:
+class Numeric:
 
-    def __init__(self, resolved):
-        self.resolved = resolved
-        self.indices = {
-            'clk': 0,
-            }
-        self.inputs = {
-            'clk': {},
-            }
-        self.outputs = {
-            'clk': {},
-            }
+    def __add__(self, other):
+        return self.get() + other
+    def __radd__(self, other):
+        return self.get() + other
+    def __sub__(self, other):
+        return self.get() - other
+    def __rsub__(self, other):
+        return other - self.get()
+    def __mul__(self, other):
+        return other * self.get()
+    def __rmul__(self, other):
+        return other * self.get()
+    def __truediv__(self, other):
+        return self.get() / other
+    def __rtruediv__(self, other):
+        return other / self.get()
+    def __mod__(self, other):
+        return self.get() % other
+    def __rmod__(self, other):
+        return other % self.get()
+    def __lt__(self, other):
+        return self.get() < other
+    def __rlt__(self, other):
+        return other < self.get()
+    def __le__(self, other):
+        return self.get() <= other
+    def __rle__(self, other):
+        return other <= self.get()
+    def __eq__(self, other):
+        return self.get() == other
+    def __req__(self, other):
+        return other == self.get()
+    def __ne__(self, other):
+        return self.get() != other
+    def __rne__(self, other):
+        return other != self.get()
+    def __gt__(self, other):
+        return self.get() > other
+    def __rgt__(self, other):
+        return other > self.get()
+    def __ge__(self, other):
+        return self.get() >= other
+    def __rge__(self, other):
+        return other >= self.get()
 
-    def get_clk_name(self):
-        return 'clk'
 
-    def set_inputs(self, inputs, clk_name=None):
-        if clk_name is None:
-            clk_name = self.get_clk_name()
-        self.inputs[clk_name] = inputs
+class StdLogic:
 
-    def get_inputs(self, clk_name):
-        return self.inputs[clk_name]
+    def __init__(self, direction):
+        self.direction = direction
+        self.value = None
 
-    def set_outputs(self, outputs, clk_name):
-        self.outputs[clk_name] = outputs
+    def set(self, value):
+        assert value in (0, 1, None)
+        self.value = value
 
-    def get_outputs(self, clk_name=None):
-        if clk_name is None:
-            clk_name = self.get_clk_name()
-        return self.outputs[clk_name]
+    def get(self):
+        assert self.value in (0, 1, None)
+        return self.value
+
+    def __eq__(self, other):
+        return self.get() == other
+        
+    def __ne__(self, other):
+        return self.get() != other
+
+
+class Unsigned(Numeric):
+    
+    def __init__(self, direction, width):
+        self.direction = direction
+        self.value = None
+        self.max_value = pow(2, width)-1
+
+    def set(self, value):
+        assert (value is None) or ((value >=0) and (value <= self.max_value))
+        self.value = value
+
+    def get(self):
+        assert (self.value is None) or ((self.value >=0) and (self.value <= self.max_value))
+        return self.value
+
+
+class Record:
+
+    def __init__(self, direction, typ):
+        self.__dict__['typ'] = typ
+        self.__dict__['_pieces'] = {}
+        for sub_name, sub_typ in typ.names_and_subtypes:
+            self.__dict__['_pieces'][sub_name] = interface_from_type(direction, sub_typ)
+        self.__dict__['direction'] = direction
+
+    def __setattr__(self, name, value):
+        piece = self.__dict__['_pieces'][name]
+        piece.set(value)
+
+    def __getattr__(self, name):
+        piece = self.__dict__['_pieces'][name]
+        return piece
+
+    def set(self, value):
+        for key, sub_value in value.items():
+            setattr(self, key, sub_value)
+
+    def get(self):
+        value = {}
+        for name, piece in self.__dict__['_pieces'].items():
+            value[name] = getattr(self, name).get()
+        return value
+
+    def get_inputs(self):
+        value = {}
+        for name, piece in self.__dict__['_pieces'].items():
+            if piece.direction == 'in':
+                value[name] = piece.get()
+        return value
+
+    def __eq__(self, other):
+        return self.get() == other
+        
+    def __ne__(self, other):
+        return self.get() != other
+
+
+def interface_from_type(direction, typ):
+    if type(typ) == typs.StdLogic:
+        interface = StdLogic(direction)
+    elif type(typ) == typs.Record:
+        interface = Record(direction, typ)
+    elif type(typ) == typs.ConstrainedStdLogicVector:
+        interface = Unsigned(direction, typ.width)
+    else:
+        import pdb
+        pdb.set_trace()
+    return interface
+    
+
+
+class DutInterface(Record):
+
+    def __init__(self, resolved, entity_name, ignored_ports=None):
+        entity = resolved['entities'][entity_name]
+        self.__dict__['_in_ports'] = {}
+        self.__dict__['_pieces'] = {}
+        for port_name, port in entity.ports.items():
+            if (ignored_ports is None) or (port_name not in ignored_ports):
+                self.__dict__['_in_ports'][port_name] = port
+                self.__dict__['_pieces'][port_name] = interface_from_type(port.direction, port.typ)
+
+    def set(self, value):
+        for key, sub_value in value.items():
+            piece = getattr(self, key)
+            assert piece.direction == 'in'
+            piece.set(sub_value)
+
+    def set_from_simulation(self, value):
+        for key, sub_value in value.items():
+            piece = getattr(self, key)
+            assert piece.direction == 'out'
+            piece.set(sub_value)
+
 
 
 class EventLoop(asyncio.AbstractEventLoop):
