@@ -4,7 +4,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 
 library std;
-use std.textio;
+use std.textio.all;
 use work.txt_util.all;
 
 entity write_pipe is
@@ -15,23 +15,23 @@ entity write_pipe is
 end entity;
 
 architecture arch of write_pipe is
-  file output_file : textio.text;
+  file output_file : text;
 begin
 
   process
-    variable output_line : textio.line;
+    variable output_line : line;
   begin
 
     report "writing: opening output pipe " & FILENAME severity note;
-    textio.file_open(output_file, FILENAME, write_mode);
+    file_open(output_file, FILENAME, write_mode);
     report "writing: opened output pipe" severity note;
     while true loop
       wait until rising_edge(clk);
       report "writing: edge has risen width = " & integer'image(WIDTH) severity note;
       print(output_file, str(in_data));
-      textio.flush(output_file);
+      flush(output_file);
     end loop;
-    textio.file_close(output_file);
+    file_close(output_file);
 
     wait;
   end process;

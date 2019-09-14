@@ -22,6 +22,7 @@ LOOP = None
 def start_ghdl_process(directory, filenames, testbench_name):
     pwd = os.getcwd()
     os.chdir(directory)
+    logger.debug('Directory is {}'.format(directory))
     analyzed = []
     for filename in filenames:
         if filename not in analyzed:
@@ -30,12 +31,15 @@ def start_ghdl_process(directory, filenames, testbench_name):
     cmd = ['ghdl', '-r', '--std=08', testbench_name]
     dump_wave = True
     if dump_wave:
-        cmd.append('--wave=wave.ghw')
+        cmd.append('--vcd=wave.vcd')
     cmd += ['-gPIPE_PATH=' + directory]
     process = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        cmd,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
     os.chdir(pwd)
     return process
+
 
 
 class Simulator:
@@ -49,6 +53,7 @@ class Simulator:
 
         top_testbench = top_entity + '_tb'
 
+        logger.debug('Making testbench')
         with_slvcodec_files = add_slvcodec_files(directory, filenames)
         generated_fns, generated_wrapper_fns, resolved = filetestbench_generator.prepare_files(
             directory=ftb_directory, filenames=with_slvcodec_files,
@@ -57,24 +62,32 @@ class Simulator:
         )
         combined_filenames = with_slvcodec_files + generated_fns + generated_wrapper_fns
 
+        logger.debug('Creating named pipes.')
         os.mkfifo(os.path.join(directory, 'indata_{}.dat'.format(clk_name)))
         os.mkfifo(os.path.join(directory, 'outdata_{}.dat'.format(clk_name)))
-        self.process = start_ghdl_process(directory, combined_filenames, top_testbench)
-
-        self.stdout_poll = select.poll()
-        self.stdout_poll.register(self.process.stdout, select.POLLIN)
-
-        self.stderr_poll = select.poll()
-        self.stderr_poll.register(self.process.stderr, select.POLLIN)
 
         self.entity = resolved['entities'][top_entity]
+
+        logger.debug('String simulation process.')
+        self.process = start_ghdl_process(directory, combined_filenames, top_testbench)
+        logger.debug('Simulation process started.')
+        self.stdout_poll = select.poll()
+        self.stdout_poll.register(self.process.stdout, select.POLLIN)
+        self.stderr_poll = select.poll()
+        self.stderr_poll.register(self.process.stderr, select.POLLIN)
+        self.log()
+
+        logger.debug('Opening handles')
         self.in_handle = open(os.path.join(directory, 'indata_{}.dat'.format(clk_name)), 'w')
         self.out_handle = open(os.path.join(directory, 'outdata_{}.dat'.format(clk_name)))
+        logger.debug('Opened handles')
         self.out_width = self.entity.output_width(generics)
 
         self.clk_name = clk_name
         self.generics = generics
+        logger.debug('Making dut interface.')
         self.dut = DutInterface(resolved, top_entity, ignored_ports=['clk'])
+
 
     def log(self):
         logger.debug('Starting ghdl logging')
@@ -102,8 +115,10 @@ class Simulator:
 
     def __del__(self):
         logger.debug('Closing handles')
-        self.out_handle.close()
-        self.in_handle.close()
+        if hasattr(self, 'out_handle'):
+            self.out_handle.close()
+        if hasattr(self, 'in_handle'):
+            self.in_handle.close()
 
 
 class Numeric:
@@ -168,11 +183,22 @@ class StdLogic:
         assert self.value in (0, 1, None)
         return self.value
 
+    def get_if_leaf(self):
+        return self.get()
+
     def __eq__(self, other):
         return self.get() == other
         
     def __ne__(self, other):
         return self.get() != other
+
+    def __bool__(self):
+        if self.value == 0:
+            return False
+        elif self.value == 1:
+            return True
+        else:
+            raise ValueError('StdLogic has value {}. Cannot be cast to boolean'.format(self.value))
 
 
 class Unsigned(Numeric):
@@ -190,6 +216,36 @@ class Unsigned(Numeric):
         assert (self.value is None) or ((self.value >=0) and (self.value <= self.max_value))
         return self.value
 
+    def get_if_leaf(self):
+        return self.get()
+
+
+class Array:
+
+    def __init__(self, direction, typ):
+        sub_type = typ.unconstrained_type.subtype
+        self.size = typ.size.value()
+        self.items = [interface_from_type(direction, sub_type) for i in range(self.size)]
+
+    def __getitem__(self, index):
+        return self.items[index].get_if_leaf()
+
+    def __setitem__(self, index, value):
+        self.items[index].set(value)
+
+    def get(self):
+        return [item.get() for item in self.items]
+
+    def set(self, items):
+        if items is None:
+            items = [None] * len(self.items)
+        assert len(items) == self.size
+        for index, item in enumerate(items):
+            self.items[index].set(item)
+
+    def get_if_leaf(self):
+        return self
+
 
 class Record:
 
@@ -205,17 +261,26 @@ class Record:
         piece.set(value)
 
     def __getattr__(self, name):
+        return self.get_element(name).get_if_leaf()
+
+    def get_element(self, name):
         piece = self.__dict__['_pieces'][name]
         return piece
 
     def set(self, value):
-        for key, sub_value in value.items():
-            setattr(self, key, sub_value)
+        if value is None:
+            for piece in self.__dict__['_pieces'].values():
+                piece.set(value)
+        else:
+            for key, sub_value in value.items():
+                setattr(self, key, sub_value)
 
     def get(self):
         value = {}
         for name, piece in self.__dict__['_pieces'].items():
-            value[name] = getattr(self, name).get()
+            value[name] = getattr(self, name)
+            if hasattr(value[name], 'get'):
+                value[name] = value[name].get()
         return value
 
     def get_inputs(self):
@@ -231,14 +296,22 @@ class Record:
     def __ne__(self, other):
         return self.get() != other
 
+    def get_if_leaf(self):
+        return self
+
 
 def interface_from_type(direction, typ):
     if type(typ) == typs.StdLogic:
         interface = StdLogic(direction)
     elif type(typ) == typs.Record:
         interface = Record(direction, typ)
-    elif type(typ) == typs.ConstrainedStdLogicVector:
-        interface = Unsigned(direction, typ.width)
+    elif type(typ) in (typs.ConstrainedStdLogicVector, typs.ConstrainedUnsigned):
+        width = typ.width
+        if not isinstance(width, int):
+            width = width.value()
+        interface = Unsigned(direction, width)
+    elif type(typ) == typs.ConstrainedArray:
+        interface = Array(direction, typ)
     else:
         import pdb
         pdb.set_trace()
@@ -265,7 +338,7 @@ class DutInterface(Record):
 
     def set_from_simulation(self, value):
         for key, sub_value in value.items():
-            piece = getattr(self, key)
+            piece = self.get_element(key)
             assert piece.direction == 'out'
             piece.set(sub_value)
 
@@ -285,6 +358,7 @@ class EventLoop(asyncio.AbstractEventLoop):
         super().__init__()
 
     def run_forever(self):
+        global LOOP
         self._running = True
         while not self.terminated:
             while self._immediate:
@@ -295,6 +369,7 @@ class EventLoop(asyncio.AbstractEventLoop):
                     if isinstance(self._exc, TerminateException):
                         logger.debug('Terminating')
                         self.terminated = True
+                        LOOP = None
                         break
                     else:
                         raise self._exc
@@ -345,3 +420,5 @@ def gather(*args, **kwargs):
     if 'loop' not in kwargs:
         kwargs['loop'] = LOOP
     return asyncio.gather(*args, **kwargs)
+
+
