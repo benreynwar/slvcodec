@@ -28,5 +28,6 @@ setup(
         'pytest',
         'vunit-hdl',
         'axilent>=0.1.3',
+        'pyyaml',
     ],
 )

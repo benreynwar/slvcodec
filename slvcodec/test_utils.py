@@ -106,8 +106,24 @@ def register_test_with_vunit(
     )
 
 
+def get_filenames_from_core(core_name, working_dir, fusesoc_conf_file=None, tool='vivado'):
+    cmd = ['fusesoc', '--verbose']
+    if fusesoc_conf_file is not None:
+        cmd += ['--config', fusesoc_conf_file]
+    cmd += ['run', '--tool', tool, '--setup', core_name]
+    subprocess.call(cmd, cwd=working_dir)
+    output_dir = os.path.join(working_dir, 'build', core_name + '_0', 'default-'+tool)
+    with open(yaml_filename, 'r') as f:
+        data = yaml.load(f.read())
+    base_filenames = [f['name'] for f in data['files']]
+    filenames += [f if f[0] == '/' else
+                 os.path.abspath(os.path.join(output_dir, f)) for f in base_filenames]
+    return filenames
+
+
 def register_coretest_with_vunit(
-        vu, test, test_output_directory, add_double_wrapper=False, default_generics={}):
+        vu, test, test_output_directory, add_double_wrapper=False, default_generics={},
+        fusesoc_config_filename=None):
     '''
     Register a test with vunit.
     Args:
@@ -116,6 +132,7 @@ def register_coretest_with_vunit(
       `test`: A dictionary containing:
         `param_sets`: An iteratable of top_params with lists of generics.
         `core_name`: The name of the fusesoc core to test.
+        `wrapper_core_name`: The name of a fusesoc core that wraps the synthesizable part.
         `top_entity`: The name of the entity to test.
         `generator`: A function that takes (resolved, generics, top_params) and
          returns an object with make_input_data and check_output_data methods.
@@ -123,9 +140,6 @@ def register_coretest_with_vunit(
          Useful if you want the test to also work post-synthesis.
       `default_generics`: Default values for generics.
     '''
-    # Put this import here so we only need it if necessary.
-    # FIXME: Remove fusesoc generators requirement here.
-    import fusesoc_generators
     if 'param_sets' in test:
         param_sets = test['param_sets']
     elif 'all_generics' in test:
@@ -149,9 +163,11 @@ def register_coretest_with_vunit(
             generation_directory = os.path.join(
                 test_output_directory, test['core_name'], 'generated_{}'.format(generated_index))
         os.makedirs(generation_directory)
-        filenames = fusesoc_generators.get_filenames_from_core(
-            generation_directory, test['core_name'], test['entity_name'],
-            generic_sets, top_params, add_slvcodec_files)
+        filenames = get_filenames_from_core(
+            core_name=test['core_name'],
+            working_dir=generation_directory,
+            fusesoc_conf_file=fusesoc_config_filename,
+            )
         ftb_directory = os.path.join(generation_directory, 'ftb')
         if os.path.exists(ftb_directory):
             shutil.rmtree(ftb_directory)

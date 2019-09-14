@@ -41,11 +41,3 @@ def setup_vunit(argv=None):
     vu = VUnit.from_args(args)
     vu.log_level = getattr(logging, log_level.upper())
     return vu
-
-
-def setup_fusesoc(cores_roots):
-    '''
-    Prepares fusesoc by specifying where core files are located.
-    '''
-    import fusesoc_generators
-    fusesoc_generators.add_cores_roots(cores_roots)

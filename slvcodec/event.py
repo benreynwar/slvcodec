@@ -86,7 +86,7 @@ class Simulator:
         self.clk_name = clk_name
         self.generics = generics
         logger.debug('Making dut interface.')
-        self.dut = DutInterface(resolved, top_entity, ignored_ports=['clk'])
+        self.dut = DutInterface(resolved, top_entity, ignored_ports=['clk'], generics=self.generics)
 
 
     def log(self):
@@ -222,9 +222,12 @@ class Unsigned(Numeric):
 
 class Array:
 
-    def __init__(self, direction, typ):
+    def __init__(self, direction, typ, generics=None):
         sub_type = typ.unconstrained_type.subtype
-        self.size = typ.size.value()
+        if generics:
+            self.size = typs.make_substitute_generics_function(generics)(typ.size)
+        else:
+            self.size = typ.size.value()
         self.items = [interface_from_type(direction, sub_type) for i in range(self.size)]
 
     def __getitem__(self, index):
@@ -283,13 +286,6 @@ class Record:
                 value[name] = value[name].get()
         return value
 
-    def get_inputs(self):
-        value = {}
-        for name, piece in self.__dict__['_pieces'].items():
-            if piece.direction == 'in':
-                value[name] = piece.get()
-        return value
-
     def __eq__(self, other):
         return self.get() == other
         
@@ -300,7 +296,7 @@ class Record:
         return self
 
 
-def interface_from_type(direction, typ):
+def interface_from_type(direction, typ, generics={}):
     if type(typ) == typs.StdLogic:
         interface = StdLogic(direction)
     elif type(typ) == typs.Record:
@@ -311,7 +307,7 @@ def interface_from_type(direction, typ):
             width = width.value()
         interface = Unsigned(direction, width)
     elif type(typ) == typs.ConstrainedArray:
-        interface = Array(direction, typ)
+        interface = Array(direction, typ, generics)
     else:
         import pdb
         pdb.set_trace()
@@ -321,26 +317,49 @@ def interface_from_type(direction, typ):
 
 class DutInterface(Record):
 
-    def __init__(self, resolved, entity_name, ignored_ports=None):
+    def __init__(self, resolved, entity_name, ignored_ports=None, generics=None):
         entity = resolved['entities'][entity_name]
-        self.__dict__['_in_ports'] = {}
+        self.__dict__['_in_ports'] = set()
+        self.__dict__['_out_ports'] = set()
         self.__dict__['_pieces'] = {}
         for port_name, port in entity.ports.items():
             if (ignored_ports is None) or (port_name not in ignored_ports):
-                self.__dict__['_in_ports'][port_name] = port
-                self.__dict__['_pieces'][port_name] = interface_from_type(port.direction, port.typ)
-
-    def set(self, value):
-        for key, sub_value in value.items():
-            piece = getattr(self, key)
-            assert piece.direction == 'in'
-            piece.set(sub_value)
+                if port.direction == 'in':
+                    self.__dict__['_in_ports'].add(port_name)
+                elif port.direction == 'out':
+                    self.__dict__['_out_ports'].add(port_name)
+                else:
+                    raise ValueError('Invalid port direction')
+                self.__dict__['_pieces'][port_name] = interface_from_type(port.direction, port.typ, generics)
 
     def set_from_simulation(self, value):
-        for key, sub_value in value.items():
-            piece = self.get_element(key)
-            assert piece.direction == 'out'
-            piece.set(sub_value)
+        if value is None:
+            for port_name in self.__dict__['_out_ports']:
+                piece = self.__dict__['_pieces'][port_name]
+                piece.set(value)
+        else:
+            for key, sub_value in value.items():
+                assert key in self.__dict__['_out_ports']
+                piece = self.__dict__['_pieces'][key]
+                piece.set(sub_value)
+
+    def get_inputs(self):
+        value = {}
+        for port_name in self.__dict__['_in_ports']:
+            piece = self.__dict__['_pieces'][port_name]
+            value[port_name] = piece.get()
+        return value
+
+    def set(self, value):
+        if value is None:
+            for port_name in self.__dict__['_in_ports']:
+                piece = self.__dict__['_pieces'][port_name]
+                piece.set(value)
+        else:
+            for key, sub_value in value.items():
+                assert key in self.__dict__['_in_ports']
+                piece = self.__dict__['_pieces'][key]
+                piece.set(sub_value)
 
 
 

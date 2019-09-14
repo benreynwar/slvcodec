@@ -29,9 +29,9 @@ async def dummy_checker(dut, length):
                 },
             'i_datas': [random.randint(0, max_data) for i in range(3)],
             }
-        dut.set_inputs(ipt)
+        dut.set(ipt)
         await event.NextCycleFuture()
-        opt = dut.get_outputs()
+        opt = dut.get()
         assert opt['o_data'] == [0] * length
         assert opt['o_firstdata'] == ipt['i_datas'][0]
         logger.debug('expected is {} and received is {}'.format(ipt['i_datas'][0], opt['o_firstdata']))
