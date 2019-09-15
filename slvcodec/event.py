@@ -309,10 +309,8 @@ def interface_from_type(direction, typ, generics={}):
     elif type(typ) == typs.ConstrainedArray:
         interface = Array(direction, typ, generics)
     else:
-        import pdb
-        pdb.set_trace()
+        raise Exception('Unsupported type {}'.format(typ))
     return interface
-    
 
 
 class DutInterface(Record):

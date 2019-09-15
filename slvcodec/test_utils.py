@@ -13,7 +13,7 @@ import collections
 
 from slvcodec import add_slvcodec_files
 from slvcodec import filetestbench_generator
-from slvcodec import config
+from slvcodec import config, fusesoc_wrapper
 
 
 logger = logging.getLogger(__name__)
@@ -106,21 +106,6 @@ def register_test_with_vunit(
     )
 
 
-def get_filenames_from_core(core_name, working_dir, fusesoc_conf_file=None, tool='vivado'):
-    cmd = ['fusesoc', '--verbose']
-    if fusesoc_conf_file is not None:
-        cmd += ['--config', fusesoc_conf_file]
-    cmd += ['run', '--tool', tool, '--setup', core_name]
-    subprocess.call(cmd, cwd=working_dir)
-    output_dir = os.path.join(working_dir, 'build', core_name + '_0', 'default-'+tool)
-    with open(yaml_filename, 'r') as f:
-        data = yaml.load(f.read())
-    base_filenames = [f['name'] for f in data['files']]
-    filenames += [f if f[0] == '/' else
-                 os.path.abspath(os.path.join(output_dir, f)) for f in base_filenames]
-    return filenames
-
-
 def register_coretest_with_vunit(
         vu, test, test_output_directory, add_double_wrapper=False, default_generics={},
         fusesoc_config_filename=None):
@@ -163,11 +148,13 @@ def register_coretest_with_vunit(
             generation_directory = os.path.join(
                 test_output_directory, test['core_name'], 'generated_{}'.format(generated_index))
         os.makedirs(generation_directory)
-        filenames = get_filenames_from_core(
+        filenames = fusesoc_wrapper.generate_core(
+            working_directory=generation_directory,
             core_name=test['core_name'],
-            working_dir=generation_directory,
-            fusesoc_conf_file=fusesoc_config_filename,
+            parameters={},
+            config_filename=fusesoc_config_filename,
             )
+        filenames = add_slvcodec_files(generation_directory, filenames)
         ftb_directory = os.path.join(generation_directory, 'ftb')
         if os.path.exists(ftb_directory):
             shutil.rmtree(ftb_directory)
