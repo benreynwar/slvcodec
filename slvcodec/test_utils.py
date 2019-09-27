@@ -10,10 +10,11 @@ import logging
 import random
 import subprocess
 import collections
+import yaml
 
 from slvcodec import add_slvcodec_files
 from slvcodec import filetestbench_generator
-from slvcodec import config, fusesoc_wrapper
+from slvcodec import config, fusesoc_wrapper, event
 
 
 logger = logging.getLogger(__name__)
@@ -108,7 +109,7 @@ def register_test_with_vunit(
 
 def register_coretest_with_vunit(
         vu, test, test_output_directory, add_double_wrapper=False, default_generics={},
-        fusesoc_config_filename=None):
+        fusesoc_config_filename=None, generate_iteratively=False):
     '''
     Register a test with vunit.
     Args:
@@ -127,16 +128,16 @@ def register_coretest_with_vunit(
     '''
     if 'param_sets' in test:
         param_sets = test['param_sets']
-    elif 'all_generics' in test:
-        param_sets = [{
-            'generic_sets': test['all_generics'],
-            'top_params': {},
-        }]
     else:
+        top_params = test.get('top_params', {})
+        if 'all_generics' in test:
+            all_generics = test['all_generics']
+        else:
+            all_generics = [test.get('generics', {})]
         param_sets = [{
-            'generic_sets': [{}],
-            'top_params': {},
-        }]
+            'generic_sets': all_generics,
+            'top_params': top_params,
+            }]
     generated_index = 0
     for param_set_index, param_set in enumerate(param_sets):
         generic_sets = param_set['generic_sets']
@@ -148,12 +149,22 @@ def register_coretest_with_vunit(
             generation_directory = os.path.join(
                 test_output_directory, test['core_name'], 'generated_{}'.format(generated_index))
         os.makedirs(generation_directory)
-        filenames = fusesoc_wrapper.generate_core(
-            working_directory=generation_directory,
-            core_name=test['core_name'],
-            parameters={},
-            config_filename=fusesoc_config_filename,
-            )
+        if generate_iteratively:
+            filenames = fusesoc_wrapper.generate_core_iteratively(
+                core_name=test['core_name'],
+                work_root=generation_directory,
+                all_top_generics=generic_sets,
+                top_params=top_params,
+                top_name=test['entity_name'],
+                config_filename=fusesoc_config_filename,
+                )
+        else:
+            filenames = fusesoc_wrapper.generate_core(
+                working_directory=generation_directory,
+                core_name=test['core_name'],
+                parameters=top_params,
+                config_filename=fusesoc_config_filename,
+                )
         filenames = add_slvcodec_files(generation_directory, filenames)
         ftb_directory = os.path.join(generation_directory, 'ftb')
         if os.path.exists(ftb_directory):

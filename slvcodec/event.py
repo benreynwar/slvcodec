@@ -348,6 +348,13 @@ class DutInterface(Record):
             value[port_name] = piece.get()
         return value
 
+    def get_outputs(self):
+        value = {}
+        for port_name in self.__dict__['_out_ports']:
+            piece = self.__dict__['_pieces'][port_name]
+            value[port_name] = piece.get()
+        return value
+
     def set(self, value):
         if value is None:
             for port_name in self.__dict__['_in_ports']:
