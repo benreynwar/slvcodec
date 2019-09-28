@@ -8,9 +8,6 @@ import shutil
 import itertools
 import logging
 import random
-import subprocess
-import collections
-import yaml
 
 from slvcodec import add_slvcodec_files
 from slvcodec import filetestbench_generator
@@ -107,6 +104,54 @@ def register_test_with_vunit(
     )
 
 
+def get_coretest_files(test, test_output_directory, param_set,
+                       add_double_wrapper, default_generics, fusesoc_config_filename,
+                       generate_iteratively):
+    generated_index = 0
+    generic_sets = param_set['generic_sets']
+    top_params = param_set['top_params']
+    generation_directory = os.path.join(
+        test_output_directory, test['core_name'], 'generated_{}'.format(generated_index))
+    while os.path.exists(generation_directory):
+        generated_index += 1
+        generation_directory = os.path.join(
+            test_output_directory, test['core_name'], 'generated_{}'.format(generated_index))
+    os.makedirs(generation_directory)
+    if generate_iteratively:
+        filenames = fusesoc_wrapper.generate_core_iteratively(
+            core_name=test['core_name'],
+            work_root=generation_directory,
+            all_top_generics=generic_sets,
+            top_params=top_params,
+            top_name=test['entity_name'],
+            config_filename=fusesoc_config_filename,
+            additional_generator=add_slvcodec_files,
+            )
+    else:
+        filenames = fusesoc_wrapper.generate_core(
+            working_directory=generation_directory,
+            core_name=test['core_name'],
+            parameters=top_params,
+            config_filename=fusesoc_config_filename,
+            )
+        filenames = add_slvcodec_files(generation_directory, filenames)
+    ftb_directory = os.path.join(generation_directory, 'ftb')
+    if os.path.exists(ftb_directory):
+        shutil.rmtree(ftb_directory)
+    os.makedirs(ftb_directory)
+    generated_fns, generated_wrapper_fns, resolved = filetestbench_generator.prepare_files(
+        directory=ftb_directory, filenames=filenames,
+        top_entity=test['entity_name'],
+        add_double_wrapper=add_double_wrapper,
+        clock_domains=test.get('clock_domains', None),
+        clock_periods=test.get('clock_periods', None),
+        clock_offsets=test.get('clock_offsets', None),
+        default_generics=default_generics,
+        )
+    combined_filenames = filenames + generated_fns + generated_wrapper_fns
+    return filenames, combined_filenames, resolved
+
+
 def register_coretest_with_vunit(
         vu, test, test_output_directory, add_double_wrapper=False, default_generics={},
         fusesoc_config_filename=None, generate_iteratively=False):
@@ -138,56 +183,19 @@ def register_coretest_with_vunit(
             'generic_sets': all_generics,
             'top_params': top_params,
             }]
-    generated_index = 0
-    for param_set_index, param_set in enumerate(param_sets):
-        generic_sets = param_set['generic_sets']
-        top_params = param_set['top_params']
-        generation_directory = os.path.join(
-            test_output_directory, test['core_name'], 'generated_{}'.format(generated_index))
-        while os.path.exists(generation_directory):
-            generated_index += 1
-            generation_directory = os.path.join(
-                test_output_directory, test['core_name'], 'generated_{}'.format(generated_index))
-        os.makedirs(generation_directory)
-        if generate_iteratively:
-            filenames = fusesoc_wrapper.generate_core_iteratively(
-                core_name=test['core_name'],
-                work_root=generation_directory,
-                all_top_generics=generic_sets,
-                top_params=top_params,
-                top_name=test['entity_name'],
-                config_filename=fusesoc_config_filename,
-                )
-        else:
-            filenames = fusesoc_wrapper.generate_core(
-                working_directory=generation_directory,
-                core_name=test['core_name'],
-                parameters=top_params,
-                config_filename=fusesoc_config_filename,
-                )
-        filenames = add_slvcodec_files(generation_directory, filenames)
-        ftb_directory = os.path.join(generation_directory, 'ftb')
-        if os.path.exists(ftb_directory):
-            shutil.rmtree(ftb_directory)
-        os.makedirs(ftb_directory)
-        generated_fns, generated_wrapper_fns, resolved = filetestbench_generator.prepare_files(
-            directory=ftb_directory, filenames=filenames,
-            top_entity=test['entity_name'],
-            add_double_wrapper=add_double_wrapper,
-            clock_domains=test.get('clock_domains', None),
-            clock_periods=test.get('clock_periods', None),
-            clock_offsets=test.get('clock_offsets', None),
-            default_generics=default_generics,
-            )
-        combined_filenames = filenames + generated_fns + generated_wrapper_fns
+    for param_set in param_sets:
+        filenames, combined_filenames, resolved = get_coretest_files(
+            test, test_output_directory, param_set,
+            add_double_wrapper, default_generics, fusesoc_config_filename,
+            generate_iteratively)
         register_rawtest_with_vunit(
             vu=vu,
             resolved=resolved,
             filenames=combined_filenames,
             top_entity=test['entity_name'],
-            all_generics=generic_sets,
+            all_generics=param_set['generic_sets'],
             test_class=test['generator'],
-            top_params=top_params,
+            top_params=param_set['top_params'],
         )
     return {
         'filenames': filenames,
@@ -392,3 +400,105 @@ def split_data(is_splits, data, include_initial=False):
     if this_data:
         split_datas.append(this_data)
     return split_datas
+
+
+def make_old_style_test(test_generator, generics, top_params):
+    async def run_old_style_test(dut, loop, resolved):
+        test = test_generator(resolved, generics, top_params)
+        input_data = test.make_input_data()
+        output_data = []
+        for ipt in input_data:
+            dut.set(ipt)
+            await event.NextCycleFuture()
+            opt = dut.get_outputs()
+            output_data.append(opt)
+        test.check_output_data(input_data, output_data)
+        raise event.TerminateException()
+    return run_old_style_test
+
+
+def run_pipe_test(directory, filenames, top_entity, generics, coro, needs_resolved=False):
+    simulator = event.Simulator(directory, filenames, top_entity, generics)
+    loop = event.EventLoop(simulator)
+    if needs_resolved:
+        loop.create_task(coro(simulator.dut, loop, simulator.resolved))
+    else:
+        loop.create_task(coro(simulator.dut, loop))
+    loop.run_forever()
+
+
+def run_coretest_with_pipes(
+        test, test_output_directory, add_double_wrapper=False, default_generics={},
+        fusesoc_config_filename=None, generate_iteratively=False):
+    '''
+    Register a test with vunit.
+    Args:
+      `vu`: A vunit instance.
+      `test_output_directory`: A directory in which generated files are placed.
+      `test`: A dictionary containing:
+        `param_sets`: An iteratable of top_params with lists of generics.
+        `core_name`: The name of the fusesoc core to test.
+        `wrapper_core_name`: The name of a fusesoc core that wraps the synthesizable part.
+        `top_entity`: The name of the entity to test.
+        `generator`: A function that takes (resolved, generics, top_params) and
+         returns an object with make_input_data and check_output_data methods.
+      `add_double_wrapper`: Adds wrappers that convert to and from std_logic_vector.
+         Useful if you want the test to also work post-synthesis.
+      `default_generics`: Default values for generics.
+    '''
+    if 'param_sets' in test:
+        param_sets = test['param_sets']
+    else:
+        top_params = test.get('top_params', {})
+        if 'all_generics' in test:
+            all_generics = test['all_generics']
+        else:
+            all_generics = [test.get('generics', {})]
+        param_sets = [{
+            'generic_sets': all_generics,
+            'top_params': top_params,
+            }]
+    dir_index = 0
+    for param_set in param_sets:
+        top_params = param_set['top_params']
+
+        generated_index = 0
+        generation_directory = os.path.join(
+            test_output_directory, test['core_name'], 'generated_{}'.format(generated_index))
+        while os.path.exists(generation_directory):
+            generated_index += 1
+            generation_directory = os.path.join(
+                test_output_directory, test['core_name'], 'generated_{}'.format(generated_index))
+        os.makedirs(generation_directory)
+
+        if generate_iteratively:
+            generic_sets = param_set['generic_sets']
+            filenames = fusesoc_wrapper.generate_core_iteratively(
+                core_name=test['core_name'],
+                work_root=generation_directory,
+                all_top_generics=generic_sets,
+                top_params=top_params,
+                top_name=test['entity_name'],
+                config_filename=fusesoc_config_filename,
+                additional_generator=add_slvcodec_files,
+                )
+        else:
+            filenames = fusesoc_wrapper.generate_core(
+                working_directory=generation_directory,
+                core_name=test['core_name'],
+                parameters=top_params,
+                config_filename=fusesoc_config_filename,
+                )
+            filenames = add_slvcodec_files(generation_directory, filenames)
+        for generics in param_set['generic_sets']:
+            if 'coro' in test:
+                coro = test['coro'](generics, top_params)
+            else:
+                coro = make_old_style_test(test['generator'], generics, top_params)
+            needs_resolved = test.get('needs_resolved', True)
+            output_directory = os.path.join(test_output_directory, 'run{}'.format(dir_index))
+            while os.path.exists(output_directory):
+                dir_index += 1
+                output_directory = os.path.join(test_output_directory, 'run{}'.format(dir_index))
+            run_pipe_test(output_directory, filenames, test['entity_name'], generics,
+                          coro, needs_resolved=needs_resolved)

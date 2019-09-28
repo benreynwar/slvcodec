@@ -29,9 +29,10 @@ def start_ghdl_process(directory, filenames, testbench_name):
             subprocess.call(['ghdl', '-a', '--std=08', filename])
             analyzed.append(filename)
     cmd = ['ghdl', '-r', '--std=08', testbench_name]
-    dump_wave = True
+    dump_wave = False
     if dump_wave:
-        cmd.append('--vcd=wave.vcd')
+        #cmd.append('--vcd=wave.vcd')
+        cmd.append('--wave=wave.ghw')
     cmd += ['-gPIPE_PATH=' + directory]
     process = subprocess.Popen(
         cmd,
@@ -67,8 +68,9 @@ class Simulator:
         os.mkfifo(os.path.join(directory, 'outdata_{}.dat'.format(clk_name)))
 
         self.entity = resolved['entities'][top_entity]
+        self.resolved = resolved
 
-        logger.debug('String simulation process.')
+        logger.debug('Start simulation process.')
         self.process = start_ghdl_process(directory, combined_filenames, top_testbench)
         logger.debug('Simulation process started.')
         self.stdout_poll = select.poll()
