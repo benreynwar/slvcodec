@@ -8,6 +8,7 @@ import shutil
 import itertools
 import logging
 import random
+import inspect
 
 from slvcodec import add_slvcodec_files
 from slvcodec import filetestbench_generator
@@ -254,7 +255,11 @@ def check_output_file(entity, generics, test, output_path, first_line_repeats=0)
                     entity.outputs_from_slv(
                         line, generics=generics, subset=[p.name for p in output_ports])
                     for line in lines][first_line_repeats:][:len(i_datas[clock_name])]
-        test.check_output_data(i_datas, o_datas)
+        sig = inspect.signature(test.check_output_data)
+        if len(sig) == 2:
+            test.check_output_data(i_datas, o_datas)
+        else:
+            test.check_output_data(i_datas, o_datas, output_path)
     else:
         # Read input data
         datainfilename = os.path.join(output_path, 'indata.dat')
@@ -270,7 +275,11 @@ def check_output_file(entity, generics, test, output_path, first_line_repeats=0)
                   for line in lines][first_line_repeats:]
         trimmed_o_data = o_data[:len(i_data)]
         # Check validity.
-        test.check_output_data(i_data, trimmed_o_data)
+        sig = inspect.signature(test.check_output_data)
+        if len(sig) == 2:
+            test.check_output_data(i_datas, o_datas)
+        else:
+            test.check_output_data(i_datas, o_datas, output_path)
 
 
 def make_pre_config(test, entity, generics):
