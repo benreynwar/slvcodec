@@ -277,9 +277,9 @@ def check_output_file(entity, generics, test, output_path, first_line_repeats=0)
         # Check validity.
         sig = inspect.signature(test.check_output_data)
         if len(sig.parameters) == 2:
-            test.check_output_data(i_datas, o_datas)
+            test.check_output_data(i_data, o_data)
         else:
-            test.check_output_data(i_datas, o_datas, output_path)
+            test.check_output_data(i_data, o_data, output_path)
 
 
 def make_pre_config(test, entity, generics):
