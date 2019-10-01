@@ -256,7 +256,7 @@ def check_output_file(entity, generics, test, output_path, first_line_repeats=0)
                         line, generics=generics, subset=[p.name for p in output_ports])
                     for line in lines][first_line_repeats:][:len(i_datas[clock_name])]
         sig = inspect.signature(test.check_output_data)
-        if len(sig) == 2:
+        if len(sig.parameters) == 2:
             test.check_output_data(i_datas, o_datas)
         else:
             test.check_output_data(i_datas, o_datas, output_path)
@@ -276,7 +276,7 @@ def check_output_file(entity, generics, test, output_path, first_line_repeats=0)
         trimmed_o_data = o_data[:len(i_data)]
         # Check validity.
         sig = inspect.signature(test.check_output_data)
-        if len(sig) == 2:
+        if len(sig.parameters) == 2:
             test.check_output_data(i_datas, o_datas)
         else:
             test.check_output_data(i_datas, o_datas, output_path)
