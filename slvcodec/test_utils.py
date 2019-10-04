@@ -342,14 +342,14 @@ class WrapperTest:
             old_length = new_length
         return input_data
 
-    def check_output_data(self, input_data, output_data):
+    def check_output_data(self, input_data, output_data, output_path=None):
         n_subtests = len(self.subtests)
         for index, indices, test in zip(range(n_subtests), self.lengths, self.subtests):
             logger.debug('Checking output in subtest {}/{}'.format(index+1, n_subtests))
             start_index, end_index = indices
             sub_input_data = input_data[start_index: end_index]
             sub_output_data = output_data[start_index: end_index]
-            test.check_output_data(sub_input_data, sub_output_data)
+            test.check_output_data(sub_input_data, sub_output_data, output_path=output_path)
 
 
 def split_data(is_splits, data, include_initial=False):
