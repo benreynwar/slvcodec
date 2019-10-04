@@ -210,7 +210,6 @@ def run_vunit(tests, cores_roots, test_output_directory):
     '''
     vu = config.setup_vunit()
     config.setup_logging(vu.log_level)
-    config.setup_fusesoc(cores_roots)
     for test in tests:
         register_coretest_with_vunit(vu, test, test_output_directory)
     vu.main()
@@ -301,9 +300,9 @@ def check_output_file(entity, generics, test, output_path, first_line_repeats=0)
         # Check validity.
         sig = inspect.signature(test.check_output_data)
         if len(sig.parameters) == 2:
-            test.check_output_data(i_data, o_data)
+            test.check_output_data(i_data, trimmed_o_data)
         else:
-            test.check_output_data(i_data, o_data, output_path)
+            test.check_output_data(i_data, trimmed_o_data, output_path)
 
 
 def make_pre_config(test, entity, generics):

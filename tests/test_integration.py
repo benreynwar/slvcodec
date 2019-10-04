@@ -2,8 +2,8 @@ import os
 import random
 import shutil
 import logging
-import pytest
 
+import jinja2
 import pytest
 
 from slvcodec import test_utils, config
@@ -12,6 +12,17 @@ this_dir = os.path.abspath(os.path.dirname(__file__))
 testoutput_dir = os.path.join(this_dir, '..', 'test_outputs')
 coresdir = os.path.join(this_dir, 'cores')
 vhdl_dir = os.path.join(this_dir, 'vhdl')
+
+fusesoc_config_template = os.path.join(this_dir, 'fusesoc.conf.j2')
+def get_fusesoc_config_filename():
+    fusesoc_config_filename = os.path.join(this_dir, 'fusesoc.conf')
+    if not os.path.exists(fusesoc_config_filename):
+        with open(fusesoc_config_template, 'r') as f:
+            template = jinja2.Template(f.read())
+        content = template.render(this_dir=this_dir)
+        with open(fusesoc_config_filename, 'w') as f:
+            f.write(content)
+    return fusesoc_config_filename
 
 
 class DummyChecker:
@@ -38,6 +49,7 @@ class DummyChecker:
         return data
 
     def check_output_data(self, input_data, output_data):
+        assert len(input_data) == len(output_data)
         assert self.input_data == input_data
         o_data = [d['o_data'] for d in output_data]
         expected_data = [[0]*self.length] * len(o_data)
@@ -93,9 +105,10 @@ def test_vunit_coretest_integration():
         }],
         'generator': DummyChecker,
         }
-    config.setup_fusesoc(cores_roots=[coresdir])
     vu = config.setup_vunit(argv=['--dont-catch-exceptions'])
-    test_utils.register_coretest_with_vunit(vu, coretest, thistestoutput_dir)
+    test_utils.register_coretest_with_vunit(
+        vu, coretest, thistestoutput_dir,
+        fusesoc_config_filename=get_fusesoc_config_filename())
     all_ok = vu._main(post_run=None)
     assert all_ok
 
