@@ -95,7 +95,9 @@ def make_double_wrapper(enty, default_generics=None):
 
 
 def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
-                       default_output_path=None, default_generics=None):
+                       default_output_path=None, default_generics=None,
+                       use_pipes=False,
+                       ):
     '''
     Generate a testbench that reads inputs from a file, and writes outputs to
     a file.
@@ -162,6 +164,9 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
     if use_vunit:
         template_fn = os.path.join(os.path.dirname(__file__), 'templates',
                                    'file_testbench.vhd')
+    elif use_pipes:
+        template_fn = os.path.join(os.path.dirname(__file__), 'templates',
+                                   'pipe_testbench.vhd')
     else:
         template_fn = os.path.join(os.path.dirname(__file__), 'templates',
                                    'file_testbench_no_vunit.vhd')
@@ -241,7 +246,7 @@ def make_generic_params(enty, default_generics=None):
 def make_filetestbench_multiple_clocks(
         enty, clock_domains, add_double_wrapper=False,
         default_output_path=None, default_generics=None,
-        clock_periods=None, clock_offsets=None):
+        clock_periods=None, clock_offsets=None, use_pipes=False):
     '''
     Generate a testbench that reads inputs from a file, and writes outputs to
     a file.
@@ -276,8 +281,12 @@ def make_filetestbench_multiple_clocks(
     dut_generics = ',\n'.join(['{} => {}'.format(g.name, g.name)
                                for g in enty.generics.values()])
     # Read in the testbench template and format it.
-    template_fn = os.path.join(os.path.dirname(__file__), 'templates',
-                               'file_testbench_multiple_clocks.vhd')
+    if use_pipes:
+        template_fn = os.path.join(os.path.dirname(__file__), 'templates',
+                                   'pipe_testbench.vhd')
+    else:
+        template_fn = os.path.join(os.path.dirname(__file__), 'templates',
+                                   'file_testbench_multiple_clocks.vhd')
     if add_double_wrapper:
         dut_name = enty.identifier + '_toslvcodec'
     else:
@@ -315,7 +324,7 @@ def make_filetestbench_multiple_clocks(
 
 def prepare_files(directory, filenames, top_entity, add_double_wrapper=False, use_vunit=True,
                   dut_directory=None, default_generics=None, default_output_path=None,
-                  clock_domains=None, clock_periods=None, clock_offsets=None):
+                  clock_domains=None, clock_periods=None, clock_offsets=None, use_pipes=False):
     '''
     Parses VHDL files, and generates a testbench for `top_entity`.
     Returns a tuple of a list of testbench files, and a dictionary
@@ -327,25 +336,36 @@ def prepare_files(directory, filenames, top_entity, add_double_wrapper=False, us
     entities, packages = vhdl_parser.parse_and_resolve_files(filenames)
     resolved_entity = entities[top_entity]
     tb_fns = []
+    assert not (use_vunit and use_pipes)
     tb_fns.append(os.path.join(config.vhdldir, 'txt_util.vhd'))
     if use_vunit:
-        tb_fns.append(os.path.join(config.vhdldir, 'read_file.vhd'))
+        tb_fns += [
+            os.path.join(config.vhdldir, 'read_file.vhd'),
+            os.path.join(config.vhdldir, 'write_file.vhd'),
+        ]
+    elif use_pipes:
+        tb_fns += [
+            os.path.join(config.vhdldir, 'read_pipe.vhd'),
+            os.path.join(config.vhdldir, 'write_pipe.vhd'),
+        ]
     else:
-        tb_fns.append(os.path.join(config.vhdldir, 'read_file_no_vunit.vhd'))
+        tb_fns += [
+            os.path.join(config.vhdldir, 'read_file_no_vunit.vhd'),
+            os.path.join(config.vhdldir, 'write_file.vhd'),
+        ]
     tb_fns += [
-        os.path.join(config.vhdldir, 'write_file.vhd'),
         os.path.join(config.vhdldir, 'clock.vhd'),
     ]
     # Make file testbench
-    if clock_domains and len(clock_domains) > 1:
+    if clock_domains and ((len(clock_domains) > 1) or use_pipes):
         ftb = make_filetestbench_multiple_clocks(
             resolved_entity, clock_domains, add_double_wrapper, default_generics=default_generics,
             default_output_path=default_output_path,
-            clock_periods=clock_periods, clock_offsets=clock_offsets)
+            clock_periods=clock_periods, clock_offsets=clock_offsets, use_pipes=use_pipes)
     else:
         ftb = make_filetestbench(resolved_entity, add_double_wrapper, use_vunit=use_vunit,
                                  default_generics=default_generics,
-                                 default_output_path=default_output_path,)
+                                 default_output_path=default_output_path, use_pipes=use_pipes)
     ftb_fn = os.path.join(directory, '{}_tb.vhd'.format(
         resolved_entity.identifier))
     with open(ftb_fn, 'w') as f:

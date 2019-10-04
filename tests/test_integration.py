@@ -4,6 +4,8 @@ import shutil
 import logging
 import pytest
 
+import pytest
+
 from slvcodec import test_utils, config
 
 this_dir = os.path.abspath(os.path.dirname(__file__))

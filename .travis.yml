@@ -16,12 +16,12 @@ before_script:
   - pip install --process-dependency-links -e .
   - git clone --depth 1 https://github.com/tgingold/ghdl.git ghdl
   - cd ghdl
-  - mkdir build-llvm
-  - cd build-llvm
-  - ../configure --prefix=../../install-ghdl-llvm/ --with-llvm-config=llvm-config-3.5
+  - mkdir build
+  - cd build
+  - ../configure --prefix=../../install-ghdl/
   - make
   - make install
   - cd ../../
-  - export PATH=$PATH:`pwd`/install-ghdl-llvm/bin/
+  - export PATH=$PATH:`pwd`/install-ghdl/bin/
 
 script: pytest --doctest-modules tests slvcodec
