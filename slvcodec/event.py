@@ -304,7 +304,7 @@ def interface_from_type(direction, typ, generics={}):
     elif type(typ) == typs.Record:
         interface = Record(direction, typ)
     elif type(typ) in (typs.ConstrainedStdLogicVector, typs.ConstrainedUnsigned):
-        width = typ.width
+        width = typs.make_substitute_generics_function(generics)(typ.width)
         if not isinstance(width, int):
             width = width.value()
         interface = Unsigned(direction, width)
@@ -425,6 +425,8 @@ class EventLoop(asyncio.AbstractEventLoop):
 
     def close(self):
         del self.simulator
+        global LOOP
+        LOOP = None
 
 
 class NextCycleFuture(asyncio.Future):

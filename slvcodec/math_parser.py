@@ -646,7 +646,7 @@ class Multiplication(MultiplicationBase):
 
     def value(self):
         power_values = [get_value(item) for item in self.powers]
-        result = 1.0
+        result = 1
         for n in power_values:
             result *= n
         return result
@@ -946,3 +946,10 @@ def parse_and_simplify(s):
     parsed = parse_string(s)
     simplified = simplify(parsed)
     return simplified
+
+
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()
+
+
