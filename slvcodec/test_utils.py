@@ -349,7 +349,11 @@ class WrapperTest:
             start_index, end_index = indices
             sub_input_data = input_data[start_index: end_index]
             sub_output_data = output_data[start_index: end_index]
-            test.check_output_data(sub_input_data, sub_output_data, output_path=output_path)
+            sig = inspect.signature(test.check_output_data)
+            if len(sig.parameters) == 2:
+                test.check_output_data(sub_input_data, sub_output_data)
+            else:
+                test.check_output_data(sub_input_data, sub_output_data, output_path)
 
 
 def split_data(is_splits, data, include_initial=False):
