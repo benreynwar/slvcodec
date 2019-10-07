@@ -68,9 +68,10 @@ def get_fusesoc_top_params():
 def generate_core(working_directory, core_name, parameters, config_filename=None, tool='vivado',
                   verbose=False
                   ):
+    old_params = os.environ.get('FUSESOC_TOP_PARAMS', None)
     if parameters is not None:
         top_params_filename = os.path.join(working_directory, 'top_params.yaml')
-        os.environ['FUSESOC_TOP_PARAMS'] = top_params_filename
+        os.environ['FUSESOC_TOP_PARAMS'] = os.path.abspath(top_params_filename)
         set_fusesoc_top_params(parameters)
     cmd = ['fusesoc']
     if verbose:
@@ -92,7 +93,17 @@ def generate_core(working_directory, core_name, parameters, config_filename=None
     base_filenames = [f['name'] for f in data['files']]
     filenames = [f if f[0] == '/' else
                  os.path.abspath(os.path.join(output_dir, f)) for f in base_filenames]
-    return filenames
+    # Sometimes there seem to be repeats
+    # This is either a bug in fusesoc or in our core files.
+    # Filter them out.
+    filtered_filenames = []
+    for fn in filenames:
+        if fn not in filtered_filenames:
+            filtered_filenames.append(fn)
+
+    if old_params is not None:
+        os.environ['FUSESOC_TOP_PARAMS'] = old_params
+    return filtered_filenames
 
 
 def compile_src_files(work_root, src_files):
