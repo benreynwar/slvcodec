@@ -112,12 +112,13 @@ def compile_src_files(work_root, src_files):
     '''
     logger.debug('compiling src files {}'.format([src_files]))
     for file_name in src_files:
-        args = ['-a', '--std=08']
-        args += [file_name]
-        logger.debug('Compiling {}'.format(file_name))
-        Launcher('ghdl', args,
-                 cwd=work_root,
-                 errormsg="Failed to analyze {}".format(file_name)).run()
+        if file_name.split('.')[-1] in ('vhd', 'vhdl'):
+            args = ['-a', '--std=08']
+            args += [file_name]
+            logger.debug('Compiling {}'.format(file_name))
+            Launcher('ghdl', args,
+                     cwd=work_root,
+                     errormsg="Failed to analyze {}".format(file_name)).run()
 
 
 def elaborate(work_root, top_name):
