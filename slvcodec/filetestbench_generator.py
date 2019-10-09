@@ -8,7 +8,11 @@ from slvcodec import entity, typs, package_generator, config, vhdl_parser
 logger = logging.getLogger(__name__)
 
 
-def make_generics_wrapper(enty, generics, wrapped_name, ports_to_remove=None, for_arch_header=None):
+def make_generics_wrapper(enty, generics, wrapped_name, ports_to_remove=None, for_arch_header='', slv_interface=True):
+    if ports_to_remove is None:
+        ports_to_remove = []
+    if for_arch_header is None:
+        for_arch_header = ''
     generics = generics.copy()
     for k, v in generics.items():
         if isinstance(v, str) and (len(v) > 0) and (v[0] not in  ("'", '"')):
@@ -26,7 +30,10 @@ def make_generics_wrapper(enty, generics, wrapped_name, ports_to_remove=None, fo
         for u in enty.uses.values()
         if u.library not in ('ieee', 'std') and '_slvcodec' not in u.design_unit])
     # Read in the template and format it.
-    template_name = 'setgenerics.vhd'
+    if slv_interface:
+        template_name = 'setgenerics.vhd'
+    else:
+        template_name = 'setgenerics_not_slv.vhd'
     template_fn = os.path.join(os.path.dirname(__file__), 'templates', template_name)
     with open(template_fn, 'r') as f:
         template = jinja2.Template(f.read())
@@ -444,7 +451,8 @@ def add_slvcodec_files_inner(directory, filenames, packages, filename_to_package
 
 
 def make_add_slvcodec_files_and_setgenerics_wrapper(
-        old_name, new_name, generics, ports_to_remove=None, for_arch_header=None):
+        old_name, new_name, generics, ports_to_remove=None, for_arch_header='',
+        slv_interface=True):
     def add_slvcodec_files_and_setgenerics_wrapper(directory, filenames):
         parsed_entities, resolved_packages, filename_to_package_name = process_files(
             directory, filenames)
@@ -454,7 +462,8 @@ def make_add_slvcodec_files_and_setgenerics_wrapper(
             directory, combined_filenames, entity_names_to_resolve=[old_name])
         enty = parsed_entities[old_name]
         setgenerics_wrapper = make_generics_wrapper(
-            enty, generics, new_name, ports_to_remove, for_arch_header)
+            enty, generics, new_name, ports_to_remove, for_arch_header,
+            slv_interface=slv_interface)
         wrapper_filename = os.path.join(directory, 'top.vhd')
         with open(wrapper_filename, 'w') as f:
             f.write(setgenerics_wrapper)
