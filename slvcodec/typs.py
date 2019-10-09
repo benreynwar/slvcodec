@@ -114,7 +114,7 @@ class StdLogic:
     def __str__(self):
         return 'std_logic'
 
-    def to_slv(self, data, generics):
+    def to_slv(self, data, generics, allow_undefined=True):
         '''
         Convert the data into a string on '0's and '1's.
         '''
@@ -126,6 +126,7 @@ class StdLogic:
         elif data == 0:
             slv = '0'
         else:
+            assert allow_undefined
             slv = 'U'
         return slv
 
@@ -223,9 +224,10 @@ class ConstrainedArray:
             s = self.identifier
         return s
 
-    def to_slv(self, data, generics):
+    def to_slv(self, data, generics, allow_undefined=True):
         size = apply_generics(generics, self.size)
         if data is None:
+            assert allow_undefined
             data = [None] * size
         try:
             if len(data) != size:
@@ -234,7 +236,7 @@ class ConstrainedArray:
         except TypeError as e:
             raise ToSlvError('Data is "{}" and does not have a length.  Expected length is {}.'.format(
                 data, size)) from e
-        slv = self.unconstrained_type.to_slv(data, generics)
+        slv = self.unconstrained_type.to_slv(data, generics, allow_undefined)
         return slv
 
     def reduce_slv(self, slv, generics):
@@ -297,10 +299,11 @@ class Array:
         self.identifier = identifier
         self.subtype = subtype
 
-    def to_slv(self, data, generics):
+    def to_slv(self, data, generics, allow_undefined=True):
         if data is None:
             raise ToSlvError('Cannot convert None to binary for an unconstrained array.')
-        slv = ''.join([self.subtype.to_slv(d, generics) for d in reversed(data)])
+        slv = ''.join([self.subtype.to_slv(d, generics, allow_undefined)
+                       for d in reversed(data)])
         return slv
 
     def from_slv(self, slv, generics):
@@ -373,9 +376,10 @@ class ConstrainedStdLogicVector:
             s = self.identifier
         return s
 
-    def to_slv(self, data, generics):
+    def to_slv(self, data, generics, allow_undefined=True):
         size = int(apply_generics(generics, self.size))
         if data is None:
+            assert allow_undefined
             slv = 'U' * size
         else:
             min_value = 0
@@ -392,7 +396,7 @@ class ConstrainedStdLogicVector:
                 bits.append(data % 2)
                 data = data >> 1
             assert data == 0
-            slv = ''.join([std_logic.to_slv(b, generics) for b in reversed(bits)])
+            slv = ''.join([std_logic.to_slv(b, generics, allow_undefined) for b in reversed(bits)])
         return slv
 
     def reduce_slv(self, slv, generics):
@@ -485,9 +489,10 @@ class ConstrainedSigned(ConstrainedStdLogicVector):
         self.max_value = pow(2, size_value-1)-1
         self.min_value = -pow(2, size_value-1)
 
-    def to_slv(self, data, generics):
+    def to_slv(self, data, generics, allow_undefined):
         size = apply_generics(generics, self.size)
         if data is None:
+            assert allow_undefined
             slv = 'U' * size
         else:
             if (data < self.min_value) or (data > self.max_value):
@@ -495,7 +500,7 @@ class ConstrainedSigned(ConstrainedStdLogicVector):
                     data, self.identifier, self.min_value, self.max_value))
             if data < 0:
                 data += pow(2, size)
-            slv = ConstrainedUnsigned.to_slv(self, data, generics)
+            slv = ConstrainedUnsigned.to_slv(self, data, generics, allow_undefined)
         return slv
 
     def from_slv(self, slv, generics):
@@ -562,7 +567,7 @@ class Record:
     def __str__(self):
         return self.identifier
 
-    def to_slv(self, data, generics):
+    def to_slv(self, data, generics, allow_undefined=True):
         if data is None:
             data = {}
         invalid_names = set(data.keys()) - set([name for name, subtype in self.names_and_subtypes])
@@ -572,7 +577,7 @@ class Record:
         slvs = []
         for name, subtype in self.names_and_subtypes:
             try:
-                slvs.append(subtype.to_slv(data.get(name, None), generics))
+                slvs.append(subtype.to_slv(data.get(name, None), generics, allow_undefined))
             except ToSlvError as error:
                 message = error.args[0]
                 new_message = 'Error in element {} in record of type {}.'.format(
@@ -619,15 +624,16 @@ class Enumeration:
     def __str__(self):
         return self.identifier
 
-    def to_slv(self, data, generics):
+    def to_slv(self, data, generics, allow_undefined=True):
         if data is None:
+            assert allow_undefined
             slv = 'U' * self.width
         else:
             if data.lower() not in self.literals:
                 raise ToSlvError('Enumeration does not contain {}. Options are {}'.format(
                     data.lower(), self.literals))
             index = self.literals.index(data.lower())
-            slv = conversions.uint_to_slv(index, self.width)
+            slv = conversions.uint_to_slv(index, self.width, allow_undefined)
         return slv
 
     def reduce_slv(self, slv, generics):
