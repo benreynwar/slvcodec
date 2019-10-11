@@ -169,7 +169,7 @@ def slv_to_uint(slv):
     return total
 
 
-def uint_to_slv(uint, width):
+def uint_to_slv(uint, width, allow_undefined=True):
     '''
     Convert an unsigned integer to a string of '0' and '1'.
 
@@ -180,6 +180,7 @@ def uint_to_slv(uint, width):
     '''
     if uint is None:
         slv = 'U' * width
+        assert allow_undefined
     else:
         bits = []
         for w in range(width):
