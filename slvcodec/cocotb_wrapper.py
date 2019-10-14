@@ -1,7 +1,8 @@
 import asyncio
 import os
 
-import cocotb
+import pytest
+cocotb = pytest.importorskip('cocotb')
 from cocotb import triggers
 
 from slvcodec import event
