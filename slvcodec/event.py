@@ -29,7 +29,7 @@ def start_ghdl_process(directory, filenames, testbench_name):
             subprocess.call(['ghdl', '-a', '--std=08', filename])
             analyzed.append(filename)
     cmd = ['ghdl', '-r', '--std=08', testbench_name]
-    dump_wave = False
+    dump_wave = True
     if dump_wave:
         #cmd.append('--vcd=wave.vcd')
         cmd.append('--wave=wave.ghw')
@@ -88,7 +88,10 @@ class Simulator:
         self.clk_name = clk_name
         self.generics = generics
         logger.debug('Making dut interface.')
-        self.dut = DutInterface(resolved, top_entity, ignored_ports=['clk'], generics=self.generics)
+        self.dut = DutInterface(resolved, top_entity, ignored_ports=[clk_name],
+                                generics=self.generics)
+        self.clk_signal = 'My clock signal'
+        setattr(self.dut, clk_name, self.clk_signal)
 
 
     def log(self):
@@ -176,10 +179,29 @@ class StdLogic:
     def __init__(self, direction):
         self.direction = direction
         self.value = None
+        self.next_value = None
+        self.locked = False
+
+    def update(self):
+        self.value = self.next_value
+
+    def lock(self):
+        self.locked = True
+
+    def __str__(self):
+        if self.value == 0:
+            return '0'
+        elif self.value == 1:
+            return '1'
+        else:
+            return 'U'
+
+    def unlock(self):
+        self.locked = False
 
     def set(self, value):
         assert value in (0, 1, None)
-        self.value = value
+        self.next_value = value
 
     def get(self):
         assert self.value in (0, 1, None)
@@ -190,9 +212,12 @@ class StdLogic:
 
     def __eq__(self, other):
         return self.get() == other
-        
+
     def __ne__(self, other):
         return self.get() != other
+
+    def __le__(self, value):
+        self.set(value)
 
     def __bool__(self):
         if self.value == 0:
@@ -209,10 +234,21 @@ class Unsigned(Numeric):
         self.direction = direction
         self.value = None
         self.max_value = pow(2, width)-1
+        self.next_value = None
+        self.locked = False
+
+    def update(self):
+        self.value = self.next_value
+
+    def lock(self):
+        self.locked = True
+
+    def unlock(self):
+        self.locked = False
 
     def set(self, value):
         assert (value is None) or ((value >=0) and (value <= self.max_value))
-        self.value = value
+        self.next_value = value
 
     def get(self):
         assert (self.value is None) or ((self.value >=0) and (self.value <= self.max_value))
@@ -220,6 +256,9 @@ class Unsigned(Numeric):
 
     def get_if_leaf(self):
         return self.get()
+
+    def __le__(self, value):
+        self.set(value)
 
 
 class Array:
@@ -231,6 +270,18 @@ class Array:
         else:
             self.size = typ.size.value()
         self.items = [interface_from_type(direction, sub_type) for i in range(self.size)]
+
+    def update(self):
+        for item in self.items():
+            item.update()
+
+    def lock(self):
+        for item in self.items():
+            item.lock()
+
+    def unlock(self):
+        for item in self.items():
+            item.unlock()
 
     def __getitem__(self, index):
         return self.items[index].get_if_leaf()
@@ -251,6 +302,9 @@ class Array:
     def get_if_leaf(self):
         return self
 
+    def __le__(self, items):
+        self.set(items)
+
 
 class Record:
 
@@ -261,12 +315,24 @@ class Record:
             self.__dict__['_pieces'][sub_name] = interface_from_type(direction, sub_typ)
         self.__dict__['direction'] = direction
 
+    def update(self):
+        for item in self.__dict__['_pieces'].values():
+            item.update()
+
+    def lock(self):
+        for item in self.__dict__['_pieces'].values():
+            item.lock()
+
+    def unlock(self):
+        for item in self.__dict__['_pieces'].values():
+            item.unlock()
+
     def __setattr__(self, name, value):
         piece = self.__dict__['_pieces'][name]
         piece.set(value)
 
     def __getattr__(self, name):
-        return self.get_element(name).get_if_leaf()
+        return self.get_element(name)
 
     def get_element(self, name):
         piece = self.__dict__['_pieces'][name]
@@ -297,6 +363,9 @@ class Record:
     def get_if_leaf(self):
         return self
 
+    def __le__(self, value):
+        self.set(value)
+
 
 def interface_from_type(direction, typ, generics={}):
     if type(typ) == typs.StdLogic:
@@ -322,6 +391,10 @@ class DutInterface(Record):
         self.__dict__['_in_ports'] = set()
         self.__dict__['_out_ports'] = set()
         self.__dict__['_pieces'] = {}
+        self.__dict__['_ignored_ports'] = {}
+        if ignored_ports is not None:
+            for ignored_port in ignored_ports:
+                self.__dict__['_ignored_ports'][ignored_port] = None
         for port_name, port in entity.ports.items():
             if (ignored_ports is None) or (port_name not in ignored_ports):
                 if port.direction == 'in':
@@ -330,7 +403,8 @@ class DutInterface(Record):
                     self.__dict__['_out_ports'].add(port_name)
                 else:
                     raise ValueError('Invalid port direction')
-                self.__dict__['_pieces'][port_name] = interface_from_type(port.direction, port.typ, generics)
+                self.__dict__['_pieces'][port_name] = interface_from_type(
+                    port.direction, port.typ, generics)
 
     def set_from_simulation(self, value):
         if value is None:
@@ -342,6 +416,22 @@ class DutInterface(Record):
                 assert key in self.__dict__['_out_ports']
                 piece = self.__dict__['_pieces'][key]
                 piece.set(sub_value)
+
+    def update_in(self):
+        for port_name in self.__dict__['_in_ports']:
+            self.__dict__['_pieces'][port_name].update()
+
+    def update_out(self):
+        for port_name in self.__dict__['_out_ports']:
+            self.__dict__['_pieces'][port_name].update()
+
+    def lock(self):
+        for port_name in self.__dict__['_in_ports']:
+            self.__dict__['_pieces'][port_name].lock()
+
+    def unlock(self):
+        for port_name in self.__dict__['_in_ports']:
+            self.__dict__['_pieces'][port_name].lock()
 
     def get_inputs(self):
         value = {}
@@ -368,6 +458,18 @@ class DutInterface(Record):
                 piece = self.__dict__['_pieces'][key]
                 piece.set(sub_value)
 
+    def __setattr__(self, name, value):
+        if name in self.__dict__['_ignored_ports']:
+            self.__dict__['_ignored_ports'][name] = value
+        else:
+            piece = self.__dict__['_pieces'][name]
+            piece.set(value)
+
+    def __getattr__(self, name):
+        if name in self.__dict__['_ignored_ports']:
+            return self.__dict__['_ignored_ports'][name]
+        else:
+            return self.get_element(name)
 
 
 class EventLoop(asyncio.AbstractEventLoop):
@@ -376,6 +478,7 @@ class EventLoop(asyncio.AbstractEventLoop):
         self._immediate = collections.deque()
         self._exc = None
         self.terminated = False
+        self.post_terminate_count = 0
         self._running = False
         self.simulator = simulator
         global LOOP
@@ -383,24 +486,35 @@ class EventLoop(asyncio.AbstractEventLoop):
         LOOP = self
         super().__init__()
 
+    def run_non_simulation_tasks(self):
+        while self._immediate:
+            h = self._immediate.popleft()
+            if not h._cancelled:
+                h._run()
+            if self._exc is not None:
+                if isinstance(self._exc, TerminateException):
+                    logger.debug('Terminating')
+                    self.terminated = True
+                    LOOP = None
+                    break
+                else:
+                    raise self._exc
+
     def run_forever(self):
         global LOOP
         self._running = True
-        while not self.terminated:
-            while self._immediate:
-                h = self._immediate.popleft()
-                if not h._cancelled:
-                    h._run()
-                if self._exc is not None:
-                    if isinstance(self._exc, TerminateException):
-                        logger.debug('Terminating')
-                        self.terminated = True
-                        LOOP = None
-                        break
-                    else:
-                        raise self._exc
+        while self.post_terminate_count < 10:
+            if self.terminated:
+                self.post_terminate_count += 1
+            self.run_non_simulation_tasks()
+            self.simulator.dut.update_in()
             self.simulator.step()
-            NextCycleFuture.resolve_all()
+            self.simulator.dut.update_out()
+            ReadOnly.resolve_all()
+            self.simulator.dut.lock()
+            self.run_non_simulation_tasks()
+            RisingEdge.resolve_all()
+            self.simulator.dut.unlock()
 
     def call_soon(self, callback, *args, context=None):
         h = asyncio.Handle(callback, args, self)
@@ -420,8 +534,9 @@ class EventLoop(asyncio.AbstractEventLoop):
         return asyncio.Task(wrapper(), loop=self)
 
     def call_exception_handler(self, context):
-        logger.debug('contenxt is {}'.format(context))
-        raise context['exception']
+        logger.warning('context is {}'.format(context))
+        logger.warning('messages is {}'.format(context['message']))
+        raise Exception(str(list(context.keys())))#context['exception']
 
     def close(self):
         del self.simulator
@@ -429,11 +544,27 @@ class EventLoop(asyncio.AbstractEventLoop):
         LOOP = None
 
 
-class NextCycleFuture(asyncio.Future):
+class ReadOnly(asyncio.Future):
 
     all_futures = collections.deque()
 
     def __init__(self):
+        super().__init__(loop=LOOP)
+        self.all_futures.append(self)
+
+    @classmethod
+    def resolve_all(cls):
+        while cls.all_futures:
+            future = cls.all_futures.popleft()
+            future.set_result(None)
+
+
+class RisingEdge(asyncio.Future):
+
+    all_futures = collections.deque()
+
+    def __init__(self, signal):
+        assert signal == LOOP.simulator.clk_signal
         super().__init__(loop=LOOP)
         self.all_futures.append(self)
 

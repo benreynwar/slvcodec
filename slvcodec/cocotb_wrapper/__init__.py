@@ -3,7 +3,7 @@ import os
 
 import pytest
 cocotb = pytest.importorskip('cocotb')
-from cocotb import triggers
+from cocotb import triggers as cocotb_triggers
 
 from slvcodec import event
 
@@ -11,26 +11,15 @@ from slvcodec import event
 def using_cocotb():
     return 'COCOTB_SIM' in os.environ
 
+def using_pipe():
+    return 'PIPE_SIM' in os.environ
+
 
 def terminate():
     if using_cocotb():
         pass
     else:
         raise event.TerminateException()
-
-
-def Combine(*awaitables):
-    if using_cocotb():
-        return triggers.Combine(*awaitables)
-    else:
-        return event.gather(*awaitables)
-
-
-def Event():
-    if using_cocotb():
-        return triggers.Event()
-    else:
-        return AsyncioEvent()
 
 
 def coroutine(func):
@@ -41,14 +30,35 @@ def coroutine(func):
         return func
 
 
+def test():
+    if using_cocotb():
+        wrapped = cocotb.test()
+        return wrapped
+    else:
+        def wrapped(func):
+            return func
+        return wrapped
+
+
+def fork(coro):
+    if using_cocotb():
+        task = cocotb.fork(coro)
+    elif using_pipe():
+        task = event.LOOP.create_task(coro)
+    else:
+        task = asyncio.create_task(coro)
+    return task
+
 
 class AsyncioEvent:
 
-    def __init__(self):
-        self.future = asyncio.Future()
+    def __init__(self, loop):
+        self.future = asyncio.Future(loop=loop)
+        self.data = None
 
     def set(self, value):
         self.future.set_result(value)
+        self.data = value
 
     def wait(self):
         return self.future
@@ -57,7 +67,7 @@ class AsyncioEvent:
 class CocotbFuture:
 
     def __init__(self):
-        self.event = triggers.Event()
+        self.event = cocotb_triggers.Event()
         self.is_done = False
         self.value = None
 

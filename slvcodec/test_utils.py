@@ -13,6 +13,7 @@ import inspect
 from slvcodec import add_slvcodec_files
 from slvcodec import filetestbench_generator
 from slvcodec import config, fusesoc_wrapper, event
+from slvcodec import cocotb_utils
 
 
 logger = logging.getLogger(__name__)
@@ -431,11 +432,12 @@ def make_old_style_test(test_generator, generics, top_params):
 
 def run_pipe_test(directory, filenames, top_entity, generics, coro, needs_resolved=False):
     simulator = event.Simulator(directory, filenames, top_entity, generics)
+    os.environ['PIPE_SIM'] = 'True'
     loop = event.EventLoop(simulator)
     if needs_resolved:
-        loop.create_task(coro(simulator.dut, loop, simulator.resolved))
+        loop.create_task(coro(simulator.dut, simulator.resolved))
     else:
-        loop.create_task(coro(simulator.dut, loop))
+        loop.create_task(coro(simulator.dut))
     loop.run_forever()
 
 
@@ -514,3 +516,65 @@ def run_coretest_with_pipes(
                 output_directory = os.path.join(test_output_directory, 'run{}'.format(dir_index))
             run_pipe_test(output_directory, filenames, test['entity_name'], generics,
                           coro, needs_resolved=needs_resolved)
+
+
+def run_coretest_with_cocotb(
+        test, test_output_directory, fusesoc_config_filename=None, generate_iteratively=False):
+    '''
+    Run a test with cocotb.
+    Args:
+      `test_output_directory`: A directory in which generated files are placed.
+      `test`: A dictionary containing:
+        `param_sets`: An iteratable of top_params with lists of generics.
+        `core_name`: The name of the fusesoc core to test.
+        `wrapper_core_name`: The name of a fusesoc core that wraps the synthesizable part.
+        `top_entity`: The name of the entity to test.
+        `test_module_name`: A cocotb test module name.
+    '''
+    if 'param_sets' in test:
+        param_sets = test['param_sets']
+    else:
+        top_params = test.get('top_params', {})
+        if 'all_generics' in test:
+            all_generics = test['all_generics']
+        else:
+            all_generics = [test.get('generics', {})]
+        param_sets = [{
+            'generic_sets': all_generics,
+            'top_params': top_params,
+            }]
+    for param_set in param_sets:
+        top_params = param_set['top_params']
+
+        generated_index = 0
+        generation_directory = os.path.join(
+            test_output_directory, test['core_name'], 'generated_{}'.format(generated_index))
+        while os.path.exists(generation_directory):
+            generated_index += 1
+            generation_directory = os.path.join(
+                test_output_directory, test['core_name'], 'generated_{}'.format(generated_index))
+        os.makedirs(generation_directory)
+
+        if generate_iteratively:
+            generic_sets = param_set['generic_sets']
+            filenames = fusesoc_wrapper.generate_core_iteratively(
+                core_name=test['core_name'],
+                work_root=generation_directory,
+                all_top_generics=generic_sets,
+                top_params=top_params,
+                top_name=test['entity_name'],
+                config_filename=fusesoc_config_filename,
+                additional_generator=add_slvcodec_files,
+                )
+        else:
+            filenames = fusesoc_wrapper.generate_core(
+                working_directory=generation_directory,
+                core_name=test['core_name'],
+                parameters=top_params,
+                config_filename=fusesoc_config_filename,
+                )
+            filenames = add_slvcodec_files(generation_directory, filenames)
+        for generics in param_set['generic_sets']:
+            cocotb_utils.run_with_cocotb(
+                generation_directory, filenames, test['entity_name'],
+                generics, test['test_module_name'], test['test_params'])
