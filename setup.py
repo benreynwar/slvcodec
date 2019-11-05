@@ -27,7 +27,7 @@ setup(
         'jinja2>=2.8',
         'pytest',
         'vunit-hdl',
-        'axilent>=0.1.3',
         'pyyaml',
+        'cocotb',
     ],
 )
