@@ -29,5 +29,6 @@ setup(
         'vunit-hdl',
         'pyyaml',
         'cocotb',
+        'cocotb-test',
     ],
 )
