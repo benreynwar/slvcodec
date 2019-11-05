@@ -76,10 +76,14 @@ def make_flat_wrapper(enty, wrapped_name, separator= '_', generics=None):
         template = jinja2.Template(f.read())
     combined_generics = []
     for generic in enty.generics.values():
+        value = generics[generic.name]
+        if isinstance(value, str):
+            if value[0] not in ("'", '"'):
+                value = '"' + value + '"'
         combined_generics.append({
             'name': generic.name,
             'typ': generic.typ,
-            'value': generics[generic.name],
+            'value': value,
             })
     wrapper = template.render(
         entity_name=enty.identifier,

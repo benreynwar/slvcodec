@@ -272,15 +272,15 @@ class Array:
         self.items = [interface_from_type(direction, sub_type) for i in range(self.size)]
 
     def update(self):
-        for item in self.items():
+        for item in self.items:
             item.update()
 
     def lock(self):
-        for item in self.items():
+        for item in self.items:
             item.lock()
 
     def unlock(self):
-        for item in self.items():
+        for item in self.items:
             item.unlock()
 
     def __getitem__(self, index):
@@ -304,6 +304,9 @@ class Array:
 
     def __le__(self, items):
         self.set(items)
+
+    def __eq__(self, items):
+        return self.get() == items
 
 
 class Record:

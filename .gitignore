@@ -1,1 +1,12 @@
 *.pyc
+build
+dist
+.cache
+.eggs
+slvcodec.egg-info
+test_outputs
+vunit_out
+test/vunit_out
+tests/sim_build
+tests/fusesoc.conf
+tests/test_output

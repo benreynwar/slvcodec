@@ -10,9 +10,5 @@ class DummyTestSuccess:
 
 if cocotb_wrapper.using_cocotb():
     TestSuccess = cocotb_result.TestSuccess
-elif cocotb_wrapper.using_pipe():
-    TestSuccess = event.TerminateException
 else:
-    TestSuccess = DummyTestSuccess
-
-
+    TestSuccess = event.TerminateException

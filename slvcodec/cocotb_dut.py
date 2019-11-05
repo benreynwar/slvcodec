@@ -25,7 +25,7 @@ def get_value(dut, base_name, mapping, separator):
     if isinstance(mapping, dict):
         value = {sub_key: get_value(dut, base_name + separator + sub_key, sub_mapping, separator)
                  for sub_key, sub_mapping in mapping.items()}
-    elif isinstance(value, (list, tuple)):
+    elif isinstance(mapping, (list, tuple)):
         value = [get_value(dut, base_name + separator + str(sub_index), sub_mapping, separator)
                  for sub_index, sub_mapping in enumerate(mapping)]
     else:
@@ -80,7 +80,7 @@ class Bundle:
                 if isinstance(sub_mapping, (dict, tuple, list)):
                     self.elements.append(Bundle(name, parent, sub_mapping, separator))
                 else:
-                    self.__dict__[key] = getattr(parent, name)
+                    self.elements.append(getattr(parent, name))
         
     def __getitem__(self, index):
         return self.elements[index]
@@ -90,7 +90,8 @@ class Bundle:
 
     @property
     def value(self):
-        get_value(self.parent, self.base_name, self.mapping, self.separator)
+        value = get_value(self.parent, self.base_name, self.mapping, self.separator)
+        return value
 
     @value.setter
     def set_value(self, value):

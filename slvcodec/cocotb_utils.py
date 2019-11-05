@@ -3,6 +3,8 @@ import json
 
 from cocotb_test import run
 
+from slvcodec import cocotb_wrapper as cocotb
+from slvcodec.cocotb_wrapper import triggers
 from slvcodec import typs, filetestbench_generator, flatten_generator
 
 
@@ -120,7 +122,7 @@ def get_mapping(typ, generics):
 
 
 def run_with_cocotb(generation_directory, filenames, entity_name, generics, test_module_name,
-                    test_params_producer):
+                    test_params_producer=None):
     flat_name = 'flat_' + entity_name
     entities, packages, filename_to_package_name = filetestbench_generator.process_files(
         generation_directory, filenames, entity_names_to_resolve=entity_name)
@@ -136,7 +138,10 @@ def run_with_cocotb(generation_directory, filenames, entity_name, generics, test
     os.environ['SIM'] = 'ghdl'
     mapping = get_entity_mapping(top_entity, generics=generics)
     test_params_filename = os.path.abspath(os.path.join(generation_directory, 'test_params.json'))
-    test_params = test_params_producer({'entitites': entities, 'packages': packages})
+    if test_params_producer is not None:
+        test_params = test_params_producer({'entitites': entities, 'packages': packages})
+    else:
+        test_params = {}
     with open(test_params_filename, 'w') as f:
         f.write(json.dumps({'generics': generics, 'mapping': mapping, 'test_params': test_params}))
     pwd = os.getcwd()
@@ -148,3 +153,14 @@ def run_with_cocotb(generation_directory, filenames, entity_name, generics, test
         extra_env={'test_params_filename': test_params_filename},
         )
     os.chdir(pwd)
+
+
+@cocotb.coroutine
+async def clock(clock_signal, period=2, units='ns'):
+    assert period % 2 == 0
+    while True:
+        clock_signal <= 0
+        await triggers.Timer(period//2, units=units)
+        clock_signal <= 1
+        await triggers.Timer(period//2, units=units)
+
