@@ -1,3 +1,11 @@
+"""
+This module lets communicate with a ghdl simulation over named pipes.
+
+It also defines objects that behavior similarly to cocotb's 'dut' object
+so that we can write tests that can be run both with cocotb or
+using named pipes.
+"""
+
 import os
 import asyncio
 import collections
@@ -44,6 +52,9 @@ def start_ghdl_process(directory, filenames, testbench_name):
 
 
 class Simulator:
+    """
+    The Simulator communicates with the real ghdl simulator over named pipes.
+    """
 
     def __init__(self, directory, filenames, top_entity, generics, clk_name='clk'):
         clock_domains = {clk_name: ['.*']}
@@ -127,6 +138,10 @@ class Simulator:
 
 
 class Numeric:
+    """
+    A base class that lets us directly do math on an object that
+    exposes a numeric value via the .get() method.
+    """
 
     def __add__(self, other):
         return self.get() + other
@@ -476,6 +491,21 @@ class DutInterface(Record):
 
 
 class EventLoop(asyncio.AbstractEventLoop):
+    """
+    An event loop that deals with running our python
+    coroutines as well as communicating with the
+    ghdl simulation (via the Simulator object).
+
+    We need to make sure that all python coroutines that should be
+    called are called before performing the next simulator step.
+
+    This means that we can't use the default asyncio EventLoop and
+    we have to create a custom one.
+
+    I don't really know what I'm doing here yet, so this is a pretty
+    crappy event loop, with heavy cut-and-paste stack-overflow
+    influences.
+    """
 
     def __init__(self, simulator):
         self._immediate = collections.deque()
@@ -498,26 +528,30 @@ class EventLoop(asyncio.AbstractEventLoop):
                 if isinstance(self._exc, TerminateException):
                     logger.debug('Terminating')
                     self.terminated = True
-                    LOOP = None
-                    break
                 else:
                     raise self._exc
 
     def run_forever(self):
         global LOOP
         self._running = True
-        while self.post_terminate_count < 10:
-            if self.terminated:
-                self.post_terminate_count += 1
+        while True:
             self.run_non_simulation_tasks()
+            if self.terminated:
+                break
             self.simulator.dut.update_in()
             self.simulator.step()
             self.simulator.dut.update_out()
             ReadOnly.resolve_all()
             self.simulator.dut.lock()
             self.run_non_simulation_tasks()
+            if self.terminated:
+                break
             RisingEdge.resolve_all()
             self.simulator.dut.unlock()
+        #self.cancel_all_tasks()
+        #self.run_non_simulation_tasks()
+        print(self._immediate)
+        LOOP = None
 
     def call_soon(self, callback, *args, context=None):
         h = asyncio.Handle(callback, args, self)
@@ -537,7 +571,7 @@ class EventLoop(asyncio.AbstractEventLoop):
         return asyncio.Task(wrapper(), loop=self)
 
     def call_exception_handler(self, context):
-        logger.warning('context is {}'.format(context))
+        #logger.warning('context is {}'.format(context))
         logger.warning('messages is {}'.format(context['message']))
         raise Exception(str(list(context.keys())))#context['exception']
 
@@ -582,5 +616,3 @@ def gather(*args, **kwargs):
     if 'loop' not in kwargs:
         kwargs['loop'] = LOOP
     return asyncio.gather(*args, **kwargs)
-
-

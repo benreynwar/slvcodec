@@ -1,3 +1,7 @@
+"""
+A wrapper around a subset of the cocotb.triggers module.
+"""
+
 import asyncio
 
 from cocotb import triggers as cocotb_triggers
@@ -20,7 +24,7 @@ def Event():
     elif cocotb_wrapper.using_pipe():
         return cocotb_wrapper.AsyncioEvent(event.LOOP)
     else:
-        return cocotb_wrapper.AsyncioEvent()
+        return cocotb_wrapper.AsyncioEvent(asyncio.get_event_loop())
 
 
 def Timer(*args, **kwargs):

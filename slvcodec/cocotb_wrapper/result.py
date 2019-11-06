@@ -1,11 +1,11 @@
+"""
+A wrapper around a subset of the cocotb.triggers module.
+"""
+
 import asyncio
 
 from slvcodec import cocotb_wrapper, event
 from cocotb import result as cocotb_result
-
-
-class DummyTestSuccess:
-    pass
 
 
 if cocotb_wrapper.using_cocotb():

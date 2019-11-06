@@ -1,8 +1,23 @@
+"""
+This module wraps a small subset of cocotb.
+
+This is useful because:
+1) Sometimes we want to use coroutines in cocotb tests but
+   also use these same coroutines elsewhere.
+   If we use @cocot_wrapper.coroutine to wrap them then they
+   work with cocotb but also with a standard asyncio event loop.
+   e.g. I have higher level asynchronous libraries that I use to communicate
+        with AXI4Lite designs on the FPGA and also use to communicate with
+        a cocotb simulation.
+2) The wrapper allows us to run the same tests outside cocotb using
+   named pipes for communication with the simulator.
+
+"""
+
 import asyncio
 import os
 
-import pytest
-cocotb = pytest.importorskip('cocotb')
+import cocotb
 from cocotb import triggers as cocotb_triggers
 
 from slvcodec import event
@@ -62,49 +77,3 @@ class AsyncioEvent:
 
     def wait(self):
         return self.future
-
-
-class CocotbFuture:
-
-    def __init__(self):
-        self.event = cocotb_triggers.Event()
-        self.is_done = False
-        self.value = None
-
-    def result(self):
-        if self.is_done:
-            return self.value
-        else:
-            raise Exception("Not done")
-
-    def set_result(self, value):
-        self.is_done = True
-        self.value = value
-        self.event.set(value)
-
-    def set_exception(self, exception):
-        raise NotImplementedError()
-
-    def done(self):
-        return self.is_done
-
-    def cancelled(self):
-        return False
-
-    def add_done_callback(self):
-        raise NotImplementedError()
-
-    def remove_done_callback(self):
-        raise NotImplementedError()
-
-    def cancel(self):
-        raise NotImplementedError()
-
-    def exception(self):
-        raise NotImplementedError()
-
-    def get_loop(self):
-        raise NotImplementedError()
-
-    def __await__(self):
-        yield self.event.wait()

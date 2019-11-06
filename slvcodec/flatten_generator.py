@@ -1,3 +1,21 @@
+"""
+Provides functions to create a wrapper around at VHDL entities that flattens any compound
+ports.
+
+e.g.
+-- An array port
+  i_data: in array_of_data_t(2 downto 0);
+-- becomes
+  i_data_0: in data_t;
+  i_data_1: in data_t;
+  i_data_2: in data_t;
+-- A record port
+  i_complex: in complex_t;
+-- becomes
+  i_complex_real: in signed(4 downto 0);
+  i_complex_imag: in signed(4 downto 0);
+"""
+
 import logging
 import os
 
@@ -9,6 +27,22 @@ logger = logging.getLogger(__name__)
 
 
 def flatten_type(typ, generics=None):
+    """
+    Flattens a type into its components.
+
+    Args:
+      `type`: A parsed VHDL type.
+      `generics`: Any generics that are required for flattening. (e.g. The bounds of
+         an array must be known before flattening.  This implies that fixing generics
+         is often required before flattening).
+
+    Result:
+      The output is a list of tuples.
+      Each tuple corresponds to one of the elements of the flattened type.
+      The first item in a tuple is a list of the name components.  They will be used
+      later to create the flattening name by joining them with a separator.
+      The second item in the tuple is the type of the flattened item.
+    """
     if generics is None:
         generics = {}
     if hasattr(typ, 'names_and_subtypes'):
@@ -30,6 +64,23 @@ def flatten_type(typ, generics=None):
 
 
 def make_wrapped_suffix(hierarchy):
+    """
+    Produces a string that can be used in VHDL to reference the element of the
+    compound type.
+
+    Args:
+      `hierarchy`: A list of names to get to a component in a compound type.
+
+    e.g. For a port:
+         i_complex: in array_of_complex_t(2 downto 0);
+         We can get at one of the components with
+         hierarchy = [1, 'complex']
+         Which references element 1 in that array, and finally
+         the 'complex' entry in that record.
+         The output of this function would be:
+         '(1).complex'
+         Which can be used in VHDL to reference that component.
+    """
     suffix = ''
     for level in hierarchy:
         if isinstance(level, int):
@@ -40,6 +91,20 @@ def make_wrapped_suffix(hierarchy):
 
 
 def make_flat_wrapper(enty, wrapped_name, separator= '_', generics=None):
+    """
+    Create a wrapper around a VHDL entity that flattens all the ports.
+
+    Args:
+      `enty`: A parsed and resolved VHDL entity.
+      `wrapper_name`: The name for the geneated wrapper entity.
+      `separator`: The separator to use when flattening ports.
+      `generics`: Generics are hardwired when flattening.  This is because flattening
+          often requires knowledge of the generics for example to determine the length
+          of an array.
+
+    Return:
+      A string of the VHDL to define the wrapping entity.
+    """
     # Generate use clauses required by the testbench.
     use_clauses = '\n'.join([
         'use {}.{}.{};'.format(u.library, u.design_unit, u.name_within)

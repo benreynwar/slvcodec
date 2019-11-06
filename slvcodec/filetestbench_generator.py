@@ -9,6 +9,17 @@ logger = logging.getLogger(__name__)
 
 
 def make_generics_wrapper(enty, generics, wrapped_name, ports_to_remove=None, for_arch_header='', slv_interface=True):
+    """
+    Create a wrapper around an entity which sets the generic parameters.
+    Args:
+      `enty`: A resolved entity object parsed from the VHDL.
+      `generics`: A dictionary of generics to set.
+      `wrapped_name`: The name of the entity that will do the wrapping.
+      `ports_to_remove`: These ports will not be connected to the wrapper. 
+          Use for output ports that we don't want to expose in the wrapper.
+      `for_arch_header`: Text placed at the top of the architecture.  Used for encryption headers.
+      `slv_interface`: Convert all ports to std_logic_vector and std_logic in the wrapper's ports.
+    """
     if ports_to_remove is None:
         ports_to_remove = []
     if for_arch_header is None:
@@ -51,6 +62,16 @@ def make_generics_wrapper(enty, generics, wrapped_name, ports_to_remove=None, fo
 
 
 def make_double_wrapper(enty, default_generics=None):
+    """
+    Create a two wrappers around an entity.
+    The first wrapper converts all the ports to std_logic_vector and std_logic.
+    The second wrapper converts them back to the original types.
+    Between these two wrappers is then a convenient place to do synthesis and the output wrapper
+    can be used for testing.
+    Args:
+      `enty`: A resolved entity object parsed from the VHDL.
+      `default_generics`: A dictionary of generics to set as default in the wrappers.
+    """
     if default_generics is None:
         default_generics = {}
     else:
@@ -110,6 +131,13 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
     a file.
     Args:
       `enty`: A resolved entity object parsed from the VHDL.
+      `add_double_wrapper`: Add two wrappers converting to and from std_logic_vector.  This
+         is convenient if we want to synthsize the design.
+      `use_vunit`: Make a VUnit compatiable testbench.
+      `default_output_path`: The default value for the generic that specifies the output path.
+      `default_generics`: The default values for the generics of the entity.
+      `use_pipes`: If these is True then the testbench uses named pipes for input and output
+         rather than just normal files.
     '''
     if default_generics is None:
         default_generics = {}
@@ -198,6 +226,9 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
 
 
 def process_signals(signals, type_name):
+    """
+    Generate type declarations and definitions used by the testbench.
+    """
     names_and_types = [(p.name, p.typ) for p in signals]
     record = typs.Record(type_name, names_and_types)
     slv_declarations, slv_definitions = package_generator.make_record_declarations_and_definitions(
@@ -217,7 +248,9 @@ def process_signals(signals, type_name):
 
 
 def make_use_clauses(enty):
-    # Generate use clauses required by the testbench.
+    """
+    Generate use clauses required by the testbench.
+    """
     use_clauses = '\n'.join([
         'use {}.{}.{};'.format(u.library, u.design_unit, u.name_within)
         for u in enty.uses.values()])
@@ -229,7 +262,9 @@ def make_use_clauses(enty):
 
 
 def make_generic_params(enty, default_generics=None):
-    # Get the list of generic parameters for the testbench.
+    """
+    Generate generic parameters used by the testbench.
+    """
     if default_generics is None:
         default_generics = {}
     else:
@@ -261,6 +296,12 @@ def make_filetestbench_multiple_clocks(
       `enty`: A resolved entity object parsed from the VHDL.
       `clock_domains`: An optional dictionary that maps clock_names to the
          signals in their clock domains.
+      `add_double_wrapper`: Add two wrappers converting to and from std_logic_vector.  This
+         is convenient if we want to synthsize the design.
+      `default_output_path`: The default value for the generic that specifies the output path.
+      `default_generics`: The default values for the generics of the entity.
+      `use_pipes`: If these is True then the testbench uses named pipes for input and output
+         rather than just normal files.
     '''
     grouped_ports = enty.group_ports_by_clock_domain(clock_domains)
     definitions = []
@@ -332,11 +373,11 @@ def make_filetestbench_multiple_clocks(
 def prepare_files(directory, filenames, top_entity, add_double_wrapper=False, use_vunit=True,
                   dut_directory=None, default_generics=None, default_output_path=None,
                   clock_domains=None, clock_periods=None, clock_offsets=None, use_pipes=False):
-    '''
+    """
     Parses VHDL files, and generates a testbench for `top_entity`.
     Returns a tuple of a list of testbench files, and a dictionary
     of parsed objects.
-    '''
+    """
     dut_fns = filenames[:]
     if dut_directory is None:
         dut_directory = directory
