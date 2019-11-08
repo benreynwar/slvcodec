@@ -7,7 +7,7 @@ with open(os.path.join(this_directory, 'README.rst'), encoding='utf-8') as f:
 
 setup(
     name = "slvcodec",
-    packages=['slvcodec',
+    packages=['slvcodec', 'slvcodec.cocotb_wrapper',
               ],
     package_data={'slvcodec': ['templates/*.vhd', 'vhdl/*.vhd']},
     use_scm_version = {
@@ -30,5 +30,6 @@ setup(
         'pyyaml',
         'cocotb',
         'cocotb-test',
+        'fusesoc',
     ],
 )
