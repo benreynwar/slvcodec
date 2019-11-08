@@ -580,7 +580,8 @@ def run_coretest_with_cocotb(
         for generics in param_set['generic_sets']:
             run_with_cocotb(
                 generation_directory, filenames, test['entity_name'],
-                generics, test['test_module_name'], test['test_params'], top_params)
+                generics, test['test_module_name'], test.get('test_params', None),
+                top_params)
 
 
 def run_with_cocotb(generation_directory, filenames, entity_name, generics, test_module_name,
