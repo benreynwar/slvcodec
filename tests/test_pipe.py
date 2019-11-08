@@ -4,7 +4,7 @@ import logging
 import random
 import json
 
-from slvcodec import test_utils, config, event, cocotb_utils, cocotb_dut
+from slvcodec import test_utils, config, event, cocotb_dut
 import slvcodec.cocotb_wrapper as cocotb
 from slvcodec.cocotb_wrapper import triggers, result
 import test_integration
@@ -53,7 +53,7 @@ async def cocotb_coro(dut):
     generics = params['generics']
     mapping = params['mapping']
     cocotb_dut.apply_mapping(dut, mapping, separator='_')
-    cocotb.fork(cocotb_utils.clock(dut.clk, 2))
+    cocotb.fork(test_utils.clock(dut.clk, 2))
     await dummy_checker(dut, generics)
 
 
@@ -82,7 +82,7 @@ def test_dummy():
         shutil.rmtree(cocotb_directory)
     os.makedirs(cocotb_directory)
 
-    cocotb_utils.run_with_cocotb(cocotb_directory, filenames, top_entity, generics, 'test_pipe')
+    test_utils.run_with_cocotb(cocotb_directory, filenames, top_entity, generics, 'test_pipe')
 
 
 if __name__ == '__main__':
