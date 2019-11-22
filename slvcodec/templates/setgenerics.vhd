@@ -22,7 +22,7 @@ begin
     generic map(
       {{wrapped_generics}}
       ){% endif %}
-    port map({% for port in wrapped_ports%}{% if port in wrapper_ports %}
+    port map({% for port in wrapped_ports if (port in wrapper_ports) or port.direction == "in" %}{% if port in wrapper_ports %}
       {{port.name}} => {{port.name}}_typed{% if not loop.last %},{% endif %}{% else %}{% if port.direction == "in" %}{% if port.typ.__str__() == "std_logic"%}
       {{port.name}} => '0'{% else %}
       {{port.name}} => (others => '0'){% endif %}{% if not loop.last %},{% endif %}{% endif %}{% endif %}{% endfor %}

@@ -33,7 +33,7 @@ begin
       {% if port.typ.__str__() == "std_logic"%}
         {{port.parent_name}}_typed{{port.suffix}};
       {% else %}
-        from_slvcodec({{port.parent_name}}_typed{{port.suffix}});
+        to_slvcodec({{port.parent_name}}_typed{{port.suffix}});
       {% endif %}
     {% endif %}
   {% endfor %}
