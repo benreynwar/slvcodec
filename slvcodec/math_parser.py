@@ -71,6 +71,8 @@ REGISTERED_FUNCTIONS = {
     'integer': lambda x: x,
     'ceil': math.ceil,
     'pow2': lambda x: pow(2, x),
+    'maximum': max,
+    'minimum': min,
     }
 
 
