@@ -522,7 +522,7 @@ def run_coretest_with_pipes(
 
 
 def run_coretest_with_cocotb(
-        test, test_output_directory, fusesoc_config_filename=None, generate_iteratively=False):
+        test, test_output_directory, fusesoc_config_filename=None, generate_iteratively=False, wave=False):
     '''
     Run a test with cocotb.
     Args:
@@ -581,11 +581,11 @@ def run_coretest_with_cocotb(
             run_with_cocotb(
                 generation_directory, filenames, test['entity_name'],
                 generics, test['test_module_name'], test.get('test_params', None),
-                top_params)
+                top_params, wave=wave)
 
 
 def run_with_cocotb(generation_directory, filenames, entity_name, generics, test_module_name,
-                    test_params_producer=None, top_params=None):
+                    test_params_producer=None, top_params=None, wave=False):
     flat_name = 'flat_' + entity_name
     entities, packages, filename_to_package_name = filetestbench_generator.process_files(
         generation_directory, filenames, entity_names_to_resolve=entity_name)
@@ -613,10 +613,15 @@ def run_with_cocotb(generation_directory, filenames, entity_name, generics, test
             'filenames': filenames,
             'top_params': top_params,
         }))
+    if wave:
+        simulation_args = ['--wave=dump.ghw']
+    else:
+        simulation_args = []
     pwd = os.getcwd()
     os.chdir(generation_directory)
     run.run(
         vhdl_sources=final_filenames,
+        simulation_args=simulation_args,
         toplevel=flat_name,
         module=test_module_name,
         extra_env={'test_params_filename': test_params_filename},
