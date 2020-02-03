@@ -511,3 +511,41 @@ def make_add_slvcodec_files_and_setgenerics_wrapper(
         combined_filenames.append(wrapper_filename)
         return combined_filenames
     return add_slvcodec_files_and_setgenerics_wrapper
+
+
+def make_formal_wrapper(enty, generics):
+    """
+    Create a wrapper around an entity which sets the generic parameters.
+    Args:
+      `enty`: A resolved entity object parsed from the VHDL.
+      `generics`: A dictionary of generics to set.
+    """
+    generics = generics.copy()
+    for k, v in generics.items():
+        if isinstance(v, str) and (len(v) > 0) and (v[0] not in  ("'", '"')):
+            generics[k] = '"' + v + '"'
+    # Get the list of generic parameters for the testbench.
+    wrapped_generics = ',\n'.join(['{} => {}'.format(g.name, generics[g.name])
+                                   for g in enty.generics.values()])
+    # Generate use clauses required by the testbench.
+    use_clauses = '\n'.join([
+        'use {}.{}.{};'.format(u.library, u.design_unit, u.name_within)
+        for u in enty.uses.values() if (u.design_unit not in ('std_logic_1164', 'slvcodec')) and 
+                                       ('_slvcodec' not in u.design_unit)])
+    use_clauses += '\n' + '\n'.join([
+        'use {}.{}_slvcodec.{};'.format(u.library, u.design_unit, u.name_within)
+        for u in enty.uses.values()
+        if u.library not in ('ieee', 'std') and '_slvcodec' not in u.design_unit])
+    # Read in the template and format it.
+    template_name = 'formal_wrapper.vhd'
+    template_fn = os.path.join(os.path.dirname(__file__), 'templates', template_name)
+    with open(template_fn, 'r') as f:
+        template = jinja2.Template(f.read())
+    wrapper = template.render(
+        entity_name=enty.identifier,
+        use_clauses=use_clauses,
+        wrapped_generics=wrapped_generics,
+        dut_name=enty.identifier,
+        ports=list(enty.ports.values()),
+        )
+    return wrapper
