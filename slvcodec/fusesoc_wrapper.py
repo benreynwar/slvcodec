@@ -204,16 +204,19 @@ def run(work_root, top_name, all_top_generics, generator_d):
 
 
 def compile_elab_and_run(core_name, work_root, all_top_generics, top_params, top_name,
-                         generator_d, additional_generator=None, config_filename=None):
+                         generator_d, additional_generator=None, config_filename=None,
+                         other_files=None):
     '''
     Run the generators, compile and elaborate the files, and run ghdl
     to see if any of the generators were missing generics.
     '''
+    if other_files is None:
+        other_files = []
     file_names = generate_core(work_root, core_name, top_params, config_filename=config_filename,
                                tool='vivado')
     if additional_generator is not None:
         file_names = additional_generator(work_root, file_names)
-    compile_src_files(work_root, file_names)
+    compile_src_files(work_root, other_files + file_names)
     if top_name is not None:
         elaborate(work_root, top_name)
         found_new_parameters = run(
@@ -224,7 +227,7 @@ def compile_elab_and_run(core_name, work_root, all_top_generics, top_params, top
 
 
 def generate_core_iteratively(core_name, work_root, all_top_generics, top_params, top_name,
-                              additional_generator=None, config_filename=None):
+                              additional_generator=None, config_filename=None, other_files=None):
     found_new_parameters = True
     elaboration_params = {'dummy': 'fish'}
     top_params['elaboration_params'] = elaboration_params
@@ -234,6 +237,8 @@ def generate_core_iteratively(core_name, work_root, all_top_generics, top_params
             raise RuntimeError('Too many iterations to generator core.')
         filenames, found_new_parameters = compile_elab_and_run(
             core_name, work_root, all_top_generics, top_params, top_name,
-            elaboration_params, additional_generator, config_filename)
+            elaboration_params, additional_generator, config_filename,
+            other_files=other_files,
+        )
         iteration_count += 1
     return filenames
