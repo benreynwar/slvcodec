@@ -378,6 +378,11 @@ class Expression(ExpressionBase):
         >>> parsed_parentheses = e.parse_parentheses()
         >>> parsed_parentheses.parse_functions()
         Expression(items=(Function(name='logceil', argument=Function(name='logceil', argument='5')), '-', '2'))
+        >>> s = 'minmum(5+6, 20-2)'
+        >>> e = Expression(tokensize_string(s))
+        >>> parsed_parentheses = e.parse_parentheses()
+        >>> parsed_parentheses.parse_functions()
+        Function(name='minimum'
         '''
         items = [parse_functions(item) for item in self.items]
         last_item = None
@@ -385,11 +390,25 @@ class Expression(ExpressionBase):
         for item in items:
             if (isinstance(last_item, str) and last_item[0].isalpha() and
                     isinstance(item, Expression)):
-                if len(item.items) == 1:
-                    argument = item.items[0]
-                else:
-                    argument = item
-                function_item = Function(name=last_item, argument=argument)
+                # Split arguments by commas
+                arguments = []
+                argument = []
+
+                def add_argument(argument):
+                    assert len(argument) > 0
+                    if len(argument) == 1:
+                        arguments.append(argument[0])
+                    else:
+                        arguments.append(Expression(argument))
+
+                for subitem in item.items:
+                    if subitem == ',':
+                        add_argument(argument)
+                        argument = []
+                    else:
+                        argument.append(subitem)
+                add_argument(argument)
+                function_item = Function(name=last_item, arguments=tuple(arguments))
                 new_items.append(function_item)
                 last_item = None
             else:
@@ -533,7 +552,7 @@ class Unknown(UnknownBase):
         raise MathParsingError('Cannot get value of Unknown.')
 
 
-FunctionBase = collections.namedtuple('FunctionBase', ['name', 'argument'])
+FunctionBase = collections.namedtuple('FunctionBase', ['name', 'arguments'])
 class Function(FunctionBase):
     '''
     Represents a function in the expression.  Currently it
@@ -541,32 +560,35 @@ class Function(FunctionBase):
     '''
 
     def transform(self, f):
-        new_argument = f(self.argument)
-        f = Function(name=self.name, argument=new_argument)
+        new_arguments = [f(arg) for arg in self.arguments]
+        f = Function(name=self.name, arguments=tuple(new_arguments))
         return f
 
     def collect(self, f):
-        collected = f(self.argument)
+        collected = []
+        for arg in self.arguments:
+            collected += f(arg)
         return collected
 
     def value(self):
-        argument = get_value(self.argument)
+        arguments = [get_value(arg) for arg in self.arguments]
         if self.name in REGISTERED_FUNCTIONS:
-            v = REGISTERED_FUNCTIONS[self.name](argument)
+            v = REGISTERED_FUNCTIONS[self.name](*arguments)
         else:
             raise MathParsingError('Unknown function {}'.format(self.name))
         return v
 
     def simplify(self):
-        argument = simplify(self.argument)
-        if is_number(argument) and (self.name in REGISTERED_FUNCTIONS):
-            o = REGISTERED_FUNCTIONS[self.name](argument)
+        arguments = [simplify(arg) for arg in self.arguments]
+        if is_number(arguments) and (self.name in REGISTERED_FUNCTIONS):
+            o = REGISTERED_FUNCTIONS[self.name](*arguments)
         else:
-            o = Function(name=self.name, argument=argument)
+            o = Function(name=self.name, arguments=tuple(arguments))
         return o
 
     def str_expression(self):
-        s = '{}({})'.format(self.name, str_expression(self.argument))
+        arguments = ', '.join(str_expression(arg) for arg in self.arguments)
+        s = '{}({})'.format(self.name, arguments)
         return s
 
 
@@ -951,7 +973,10 @@ def parse_and_simplify(s):
 
 
 if __name__ == '__main__':
-    import doctest
-    doctest.testmod()
-
-
+    #import doctest
+    #doctest.testmod()
+    s = 'minimum(1, 2) - 2'
+    e = Expression(tokenize_string(s))
+    parsed_parentheses = e.parse_parentheses()
+    parsed_functions = parsed_parentheses.parse_functions()
+    print(parsed_functions)
