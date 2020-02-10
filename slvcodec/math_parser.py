@@ -373,16 +373,16 @@ class Expression(ExpressionBase):
         >>> e = Expression(tokenize_string(s))
         >>> parsed_parentheses = e.parse_parentheses()
         >>> parsed_parentheses.parse_functions()
-        Expression(items=(Function(name='logceil', argument='5'), '-', '2'))
+        Expression(items=(Function(name='logceil', arguments=('5',)), '-', '2'))
         >>> e = Expression(tokenize_string('logceil(logceil(5)) - 2'))
         >>> parsed_parentheses = e.parse_parentheses()
         >>> parsed_parentheses.parse_functions()
-        Expression(items=(Function(name='logceil', argument=Function(name='logceil', argument='5')), '-', '2'))
-        >>> s = 'minmum(5+6, 20-2)'
-        >>> e = Expression(tokensize_string(s))
+        Expression(items=(Function(name='logceil', arguments=(Function(name='logceil', arguments=('5',)),)), '-', '2'))
+        >>> s = 'minimum(5+6, 20-2)'
+        >>> e = Expression(tokenize_string(s))
         >>> parsed_parentheses = e.parse_parentheses()
         >>> parsed_parentheses.parse_functions()
-        Function(name='minimum'
+        Expression(items=(Function(name='minimum', arguments=(Expression(items=('5', '+', '6')), Expression(items=('20', '-', '2')))),))
         '''
         items = [parse_functions(item) for item in self.items]
         last_item = None
