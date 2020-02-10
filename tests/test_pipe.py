@@ -38,7 +38,7 @@ async def dummy_checker(dut, generics):
         dut.i_datas <= [random.randint(0, max_data) for i in range(3)]
         await triggers.ReadOnly()
         assert dut.o_data == [0] * length
-        assert dut.o_firstdata == dut.i_datas[0]
+        assert dut.o_firstdata == int(dut.i_datas[0])
         logger.debug('expected is {} and received is {}'.format(dut.i_datas[0], dut.o_firstdata))
         assert dut.o_firstdatabit == int(dut.i_datas[0]) % 2
     logger.debug('Finished generator')
