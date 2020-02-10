@@ -580,7 +580,7 @@ class Function(FunctionBase):
 
     def simplify(self):
         arguments = [simplify(arg) for arg in self.arguments]
-        if is_number(arguments) and (self.name in REGISTERED_FUNCTIONS):
+        if all(is_number(arg) for arg in arguments) and (self.name in REGISTERED_FUNCTIONS):
             o = REGISTERED_FUNCTIONS[self.name](*arguments)
         else:
             o = Function(name=self.name, arguments=tuple(arguments))
