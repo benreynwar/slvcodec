@@ -1,8 +1,8 @@
 import os
-import yaml
 import subprocess
 import logging
 
+import yaml
 
 logger = logging.getLogger(__name__)
 

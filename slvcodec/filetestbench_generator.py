@@ -8,7 +8,8 @@ from slvcodec import entity, typs, package_generator, config, vhdl_parser
 logger = logging.getLogger(__name__)
 
 
-def make_generics_wrapper(enty, generics, wrapped_name, ports_to_remove=None, for_arch_header='', slv_interface=True):
+def make_generics_wrapper(enty, generics, wrapped_name, ports_to_remove=None, for_arch_header='',
+                          slv_interface=True):
     """
     Create a wrapper around an entity which sets the generic parameters.
     Args:
@@ -29,7 +30,7 @@ def make_generics_wrapper(enty, generics, wrapped_name, ports_to_remove=None, fo
         if isinstance(v, str) and (len(v) > 0) and (v[0] not in  ("'", '"')):
             generics[k] = '"' + v + '"'
     # Get the list of generic parameters for the testbench.
-    wrapped_generics = ',\n'.join(['{} => {}'.format(g.name, generics[g.name])
+    wrapped_generics = ',\n'.join(['{} => {}'.format(g.name, g.name)
                                    for g in enty.generics.values()])
     # Generate use clauses required by the testbench.
     use_clauses = '\n'.join([
@@ -58,7 +59,18 @@ def make_generics_wrapper(enty, generics, wrapped_name, ports_to_remove=None, fo
         wrapper_ports=list([e for e in enty.ports.values() if e.name not in ports_to_remove]),
         for_arch_header=for_arch_header,
         )
-    return wrapper
+    template_name = 'setgenerics_pkg.vhd'
+    template_fn = os.path.join(os.path.dirname(__file__), 'templates', template_name)
+    with open(template_fn, 'r') as f:
+        template = jinja2.Template(f.read())
+    constant_generics = [
+        (g.name, str(g.typ), generics[g.name])
+        for g in enty.generics.values()]
+    package = template.render(
+        use_clauses=use_clauses,
+        generics=constant_generics,
+        )
+    return wrapper, package
 
 
 def make_double_wrapper(enty, default_generics=None):
@@ -99,7 +111,8 @@ def make_double_wrapper(enty, default_generics=None):
     use_clauses += '\n' + '\n'.join([
         'use {}.{}_slvcodec.{};'.format(u.library, u.design_unit, u.name_within)
         for u in enty.uses.values()
-        if u.library not in ('ieee', 'std') and '_slvcodec' not in u.design_unit])
+        if u.library not in ('ieee', 'std') and ('_slvcodec' not in u.design_unit) and
+        (u.design_unit != 'slvcodec')])
     # Read in the toslvcodec template and format it.
     template_and_wrapped_names = (
         ('fromslvcodec.vhd', enty.identifier),
@@ -122,9 +135,20 @@ def make_double_wrapper(enty, default_generics=None):
     return wrappers
 
 
+def typ_to_slv(typ):
+    '''
+    Convert a type to a std_logic_vector or std_logic.
+    '''
+    if isinstance(typ, typs.StdLogic):
+        new_typ = typ
+    else:
+        new_typ = typs.ConstrainedStdLogicVector(identifier=None, size=typ.width)
+    return new_typ
+
+
 def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
                        default_output_path=None, default_generics=None,
-                       use_pipes=False,
+                       use_pipes=False, slv_interface=False,
                        ):
     '''
     Generate a testbench that reads inputs from a file, and writes outputs to
@@ -138,6 +162,8 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
       `default_generics`: The default values for the generics of the entity.
       `use_pipes`: If these is True then the testbench uses named pipes for input and output
          rather than just normal files.
+      `slv_interface`: Use if the ports in the test_module have already been converted to
+         accept std_logic and std_logic_vector.
     '''
     if default_generics is None:
         default_generics = {}
@@ -149,11 +175,17 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
     # Generate a record type for the entity inputs (excluding clock).
     inputs = [p for p in enty.ports.values()
               if p.direction == 'in' and p.name not in entity.CLOCK_NAMES]
-    input_names_and_types = [(p.name, p.typ) for p in inputs]
+    if slv_interface:
+        input_names_and_types = [(p.name, typ_to_slv(p.typ)) for p in inputs]
+    else:
+        input_names_and_types = [(p.name, p.typ) for p in inputs]
     input_record = typs.Record('t_input', input_names_and_types)
     # Generate a record type for the entity outputs.
     outputs = [p for p in enty.ports.values() if p.direction == 'out']
-    output_names_and_types = [(p.name, p.typ) for p in outputs]
+    if slv_interface:
+        output_names_and_types = [(p.name, typ_to_slv(p.typ)) for p in outputs]
+    else:
+        output_names_and_types = [(p.name, p.typ) for p in outputs]
     output_record = typs.Record('t_output', output_names_and_types)
     # Generate declarations and definitions for the functions to convert
     # the input and output types to and from std_logic_vector.
@@ -170,7 +202,8 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
     use_clauses += '\n' + '\n'.join([
         'use {}.{}_slvcodec.{};'.format(u.library, u.design_unit, u.name_within)
         for u in enty.uses.values()
-        if u.library not in ('ieee', 'std') and '_slvcodec' not in u.design_unit])
+        if (u.library not in ('ieee', 'std')) and ('_slvcodec' not in u.design_unit) and
+           (u.design_unit not in ('slvcodec',))])
     # Get the list of generic parameters for the testbench.
     generic_params = []
     for g in enty.generics.values():
@@ -370,9 +403,12 @@ def make_filetestbench_multiple_clocks(
     return filetestbench
 
 
-def prepare_files(directory, filenames, top_entity, add_double_wrapper=False, use_vunit=True,
-                  dut_directory=None, default_generics=None, default_output_path=None,
-                  clock_domains=None, clock_periods=None, clock_offsets=None, use_pipes=False):
+def prepare_files(
+        directory, filenames, top_entity, add_double_wrapper=False, use_vunit=True,
+        dut_directory=None, default_generics=None, default_output_path=None,
+        clock_domains=None, clock_periods=None, clock_offsets=None, use_pipes=False,
+        slv_interface=False,
+        ):
     """
     Parses VHDL files, and generates a testbench for `top_entity`.
     Returns a tuple of a list of testbench files, and a dictionary
@@ -413,7 +449,8 @@ def prepare_files(directory, filenames, top_entity, add_double_wrapper=False, us
     else:
         ftb = make_filetestbench(resolved_entity, add_double_wrapper, use_vunit=use_vunit,
                                  default_generics=default_generics,
-                                 default_output_path=default_output_path, use_pipes=use_pipes)
+                                 default_output_path=default_output_path, use_pipes=use_pipes,
+                                 slv_interface=slv_interface)
     ftb_fn = os.path.join(directory, '{}_tb.vhd'.format(
         resolved_entity.identifier))
     with open(ftb_fn, 'w') as f:
@@ -493,7 +530,7 @@ def add_slvcodec_files_inner(directory, filenames, packages, filename_to_package
 
 def make_add_slvcodec_files_and_setgenerics_wrapper(
         old_name, new_name, generics, ports_to_remove=None, for_arch_header='',
-        slv_interface=True):
+        slv_interface=True, wrapper_base_name='top.vhd'):
     def add_slvcodec_files_and_setgenerics_wrapper(directory, filenames):
         parsed_entities, resolved_packages, filename_to_package_name = process_files(
             directory, filenames)
@@ -502,13 +539,20 @@ def make_add_slvcodec_files_and_setgenerics_wrapper(
         parsed_entities, resolved_packages, filename_to_package_name = process_files(
             directory, combined_filenames, entity_names_to_resolve=[old_name])
         enty = parsed_entities[old_name]
-        setgenerics_wrapper = make_generics_wrapper(
+        setgenerics_wrapper, setgenerics_pkg = make_generics_wrapper(
             enty, generics, new_name, ports_to_remove, for_arch_header,
             slv_interface=slv_interface)
-        wrapper_filename = os.path.join(directory, 'top.vhd')
+        wrapper_filename = os.path.join(directory, wrapper_base_name)
+        package_filename = os.path.join(directory, 'setgenerics_pkg.vhd')
+        package_slvcodec_filename = os.path.join(directory, 'setgenerics_pkg_slvcodec.vhd')
         with open(wrapper_filename, 'w') as f:
             f.write(setgenerics_wrapper)
-        combined_filenames.append(wrapper_filename)
+        with open(package_filename, 'w') as f:
+            f.write(setgenerics_pkg)
+        with open(package_slvcodec_filename, 'w') as f:
+            f.write('''package setgenerics_pkg_slvcodec is
+            end package;''')
+        combined_filenames += [package_filename, package_slvcodec_filename, wrapper_filename]
         return combined_filenames
     return add_slvcodec_files_and_setgenerics_wrapper
 

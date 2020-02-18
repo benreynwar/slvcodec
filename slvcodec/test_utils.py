@@ -29,10 +29,9 @@ def remove_duplicates(filenames):
             new_filenames.append(filename)
     return new_filenames
 
-
 def register_rawtest_with_vunit(
-        vu, resolved, filenames, top_entity, all_generics, test_class,
-        top_params):
+        vu, resolved, filenames, top_entity, all_generics=None, test_class=None,
+        top_params=None, pre_config=None, post_check=None):
     '''
     Register a test with vunit.
     Args:
@@ -62,13 +61,23 @@ def register_rawtest_with_vunit(
     tb_generated = lib.entity(top_entity + '_tb')
     entity = resolved['entities'][top_entity]
     for generics_index, generics in enumerate(all_generics):
-        test = test_class(resolved, generics, top_params)
+        if (pre_config is None) or (post_check is None):
+            test = test_class(resolved, generics, top_params)
+        if pre_config is None:
+            this_pre_config = make_pre_config(test, entity, generics)
+        else:
+            this_pre_config = pre_config
+        if post_check is None:
+            this_post_check = make_post_check(test, entity, generics)
+        else:
+            this_post_check = post_check
         tb_generated.add_config(
             name=str(generics_index),
             generics=generics,
-            pre_config=make_pre_config(test, entity, generics),
-            post_check=make_post_check(test, entity, generics),
+            pre_config=this_pre_config,
+            post_check=this_post_check,
         )
+
 
 
 def register_test_with_vunit(
