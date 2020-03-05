@@ -30,8 +30,8 @@ def remove_duplicates(filenames):
     return new_filenames
 
 def register_rawtest_with_vunit(
-        vu, resolved, filenames, top_entity, all_generics=None, test_class=None,
-        top_params=None, pre_config=None, post_check=None):
+        vu, filenames, testbench_name, entity=None, resolved=None, all_generics=None,
+        test_class=None, top_params=None, pre_config=None, post_check=None):
     '''
     Register a test with vunit.
     Args:
@@ -58,8 +58,9 @@ def register_rawtest_with_vunit(
             is_unique = True
         logger.debug('Adding files to lib %s', str(filenames))
     lib.add_source_files(filenames)
-    tb_generated = lib.entity(top_entity + '_tb')
-    entity = resolved['entities'][top_entity]
+    tb_generated = lib.entity(testbench_name)
+    if all_generics is None:
+        all_generics = [{}]
     for generics_index, generics in enumerate(all_generics):
         if (pre_config is None) or (post_check is None):
             test = test_class(resolved, generics, top_params)
@@ -111,7 +112,8 @@ def register_test_with_vunit(
         vu=vu,
         resolved=resolved,
         filenames=combined_filenames,
-        top_entity=top_entity,
+        entity=resolved['entities'][top_entity],
+        testbench_name=top_entity + '_tb',
         all_generics=all_generics,
         test_class=test_class,
         top_params=top_params,
@@ -204,13 +206,14 @@ def register_coretest_with_vunit(
             generate_iteratively)
         register_rawtest_with_vunit(
             vu=vu,
-            resolved=resolved,
             filenames=combined_filenames,
-            top_entity=test['entity_name'],
+            entity=resolved['entities'][test['entity_name']],
+            testbench_name=test['entity_name'] + '_tb',
+            resolved=resolved,
             all_generics=param_set['generic_sets'],
             test_class=test['generator'],
             top_params=param_set['top_params'],
-        )
+            )
     return {
         'filenames': filenames,
         'combined_filenames': combined_filenames,
@@ -531,7 +534,9 @@ def run_coretest_with_pipes(
 
 
 def run_coretest_with_cocotb(
-        test, test_output_directory, fusesoc_config_filename=None, generate_iteratively=False, wave=False):
+        test, test_output_directory, fusesoc_config_filename=None, generate_iteratively=False,
+        wave=False, write_input_output_files=False,
+    ):
     '''
     Run a test with cocotb.
     Args:
@@ -590,38 +595,55 @@ def run_coretest_with_cocotb(
             run_with_cocotb(
                 generation_directory, filenames, test['entity_name'],
                 generics, test['test_module_name'], test.get('test_params', None),
-                top_params, wave=wave)
+                top_params, wave=wave, write_input_output_files=write_input_output_files)
 
 
 def run_with_cocotb(generation_directory, filenames, entity_name, generics, test_module_name,
-                    test_params_producer=None, top_params=None, wave=False):
-    flat_name = 'flat_' + entity_name
+                    test_params_producer=None, top_params=None, wave=False,
+                    write_input_output_files=False, flatten=True,
+                    ):
     entities, packages, filename_to_package_name = filetestbench_generator.process_files(
         generation_directory, filenames, entity_names_to_resolve=entity_name)
     combined_filenames = filetestbench_generator.add_slvcodec_files_inner(
         generation_directory, filenames, packages, filename_to_package_name)
     top_entity = entities[entity_name]
-    wrapper = flatten_generator.make_flat_wrapper(
-        top_entity, flat_name, separator='_', generics=generics)
-    wrapper_filename = os.path.join(generation_directory, flat_name + '.vhd')
-    with open(wrapper_filename, 'w') as f:
-        f.write(wrapper)
-    final_filenames = [wrapper_filename] + combined_filenames
+    if flatten:
+        top_name = 'flat_' + entity_name
+        wrapper = flatten_generator.make_flat_wrapper(
+            top_entity, top_name, separator='_', generics=generics)
+        wrapper_filename = os.path.join(generation_directory, top_name + '.vhd')
+        with open(wrapper_filename, 'w') as f:
+            f.write(wrapper)
+        final_filenames = [wrapper_filename]
+    else:
+        top_name  = entity_name
+        final_filenames = []
+    final_filenames += combined_filenames
     os.environ['SIM'] = 'ghdl'
     mapping = cocotb_dut.get_entity_mapping(top_entity, generics=generics)
+    input_port_names = [port.name for port in top_entity.ports.values() if port.direction == 'in']
+    output_port_names = [port.name for port in top_entity.ports.values() if port.direction == 'out']
     test_params_filename = os.path.abspath(os.path.join(generation_directory, 'test_params.json'))
     if test_params_producer is not None:
         test_params = test_params_producer({'entitites': entities, 'packages': packages})
     else:
         test_params = {}
+    params = {
+        'generics': generics,
+        # Use a list of tuples rather than dict so we can guarantee order.
+        'mapping': mapping,
+        'test_params': test_params,
+        'filenames': filenames,
+        'top_params': top_params,
+        }
+    if write_input_output_files:
+        params.update({
+            'input_port_names': input_port_names,
+            'output_port_names': output_port_names,
+            'directory': generation_directory,
+            })
     with open(test_params_filename, 'w') as f:
-        f.write(json.dumps({
-            'generics': generics,
-            'mapping': mapping,
-            'test_params': test_params,
-            'filenames': filenames,
-            'top_params': top_params,
-        }))
+        f.write(json.dumps(params))
     if wave:
         simulation_args = ['--wave=dump.ghw']
     else:
@@ -631,7 +653,7 @@ def run_with_cocotb(generation_directory, filenames, entity_name, generics, test
     run.run(
         vhdl_sources=final_filenames,
         simulation_args=simulation_args,
-        toplevel=flat_name,
+        toplevel=top_name,
         module=test_module_name,
         extra_env={'test_params_filename': test_params_filename},
         )

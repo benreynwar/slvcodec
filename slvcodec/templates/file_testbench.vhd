@@ -22,7 +22,9 @@ architecture arch of {{test_name}} is
   signal read_clk: std_logic;
   signal write_clk: std_logic;
   signal endsim: std_logic;
+  {{extra_definitions}}
 begin
+  {{extra_logic}}
 
   input_data <= from_slvcodec(input_slv);
   output_slv <= to_slvcodec(output_data);

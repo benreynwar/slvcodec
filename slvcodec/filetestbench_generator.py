@@ -142,13 +142,14 @@ def typ_to_slv(typ):
     if isinstance(typ, typs.StdLogic):
         new_typ = typ
     else:
-        new_typ = typs.ConstrainedStdLogicVector(identifier=None, size=typ.width)
+        new_typ = typs.ConstrainedStdLogicVector(identifier=None, size=typ.size.value())
     return new_typ
 
 
 def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
                        default_output_path=None, default_generics=None,
-                       use_pipes=False, slv_interface=False,
+                       use_pipes=False, slv_interface=False, dut_name=None,
+                       extra_definitions='', extra_logic='',
                        ):
     '''
     Generate a testbench that reads inputs from a file, and writes outputs to
@@ -163,7 +164,9 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
       `use_pipes`: If these is True then the testbench uses named pipes for input and output
          rather than just normal files.
       `slv_interface`: Use if the ports in the test_module have already been converted to
-         accept std_logic and std_logic_vector.
+         accept std_logic and std_logic_vector.  Also assumes generics have been removed.
+      `dut_name`: The name that will be used to instantiate the dut (might be different
+                       to enty.identifier if wrappers are involved).
     '''
     if default_generics is None:
         default_generics = {}
@@ -196,14 +199,17 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
         package_generator.make_record_declarations_and_definitions(
             output_record))
     # Generate use clauses required by the testbench.
-    use_clauses = '\n'.join([
-        'use {}.{}.{};'.format(u.library, u.design_unit, u.name_within)
-        for u in enty.uses.values()])
-    use_clauses += '\n' + '\n'.join([
-        'use {}.{}_slvcodec.{};'.format(u.library, u.design_unit, u.name_within)
-        for u in enty.uses.values()
-        if (u.library not in ('ieee', 'std')) and ('_slvcodec' not in u.design_unit) and
-           (u.design_unit not in ('slvcodec',))])
+    if slv_interface:
+        use_clauses = 'use work.slvcodec.all;'
+    else:
+        use_clauses = '\n'.join([
+            'use {}.{}.{};'.format(u.library, u.design_unit, u.name_within)
+            for u in enty.uses.values()])
+        use_clauses += '\n' + '\n'.join([
+            'use {}.{}_slvcodec.{};'.format(u.library, u.design_unit, u.name_within)
+            for u in enty.uses.values()
+            if (u.library not in ('ieee', 'std')) and ('_slvcodec' not in u.design_unit) and
+            (u.design_unit not in ('slvcodec',))])
     # Get the list of generic parameters for the testbench.
     generic_params = []
     for g in enty.generics.values():
@@ -212,7 +218,10 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
             as_str += ' := {}'.format(default_generics[g.name])
         as_str += ';'
         generic_params.append(as_str)
-    generic_params = '\n'.join(generic_params)[:-1]
+    if not slv_interface:
+        generic_params = '\n'.join(generic_params)[:-1]
+    else:
+        generic_params = ''
     # Combine the input and output record definitions with the slv conversion
     # functions.
     definitions = '\n'.join([
@@ -226,8 +235,11 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
     connections = ',\n'.join(['{} => {}.{}'.format(
         p.name, {'in': 'input_data', 'out': 'output_data'}[p.direction], p.name)
                               for p in enty.ports.values() if p.name not in clk_names])
-    dut_generics = ',\n'.join(['{} => {}'.format(g.name, g.name)
-                               for g in enty.generics.values()])
+    if not slv_interface:
+        dut_generics = ',\n'.join(['{} => {}'.format(g.name, g.name)
+                                for g in enty.generics.values()])
+    else:
+        dut_generics = ''
     # Read in the testbench template and format it.
     if use_vunit:
         template_fn = os.path.join(os.path.dirname(__file__), 'templates',
@@ -238,10 +250,11 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
     else:
         template_fn = os.path.join(os.path.dirname(__file__), 'templates',
                                    'file_testbench_no_vunit.vhd')
-    if add_double_wrapper:
-        dut_name = enty.identifier + '_toslvcodec'
-    else:
-        dut_name = enty.identifier
+    if dut_name is None:
+        if add_double_wrapper:
+            dut_name = enty.identifier + '_toslvcodec'
+        else:
+            dut_name = enty.identifier
     with open(template_fn, 'r') as f:
         filetestbench_template = jinja2.Template(f.read())
     filetestbench = filetestbench_template.render(
@@ -254,6 +267,8 @@ def make_filetestbench(enty, add_double_wrapper=False, use_vunit=True,
         clk_connections=clk_connections,
         connections=connections,
         output_path=default_output_path,
+        extra_definitions=extra_definitions,
+        extra_logic=extra_logic,
         )
     return filetestbench
 
@@ -407,13 +422,15 @@ def prepare_files(
         directory, filenames, top_entity, add_double_wrapper=False, use_vunit=True,
         dut_directory=None, default_generics=None, default_output_path=None,
         clock_domains=None, clock_periods=None, clock_offsets=None, use_pipes=False,
-        slv_interface=False,
+        slv_interface=False, wrapper_name=None, extra_logic='', extra_definitions='',
         ):
     """
     Parses VHDL files, and generates a testbench for `top_entity`.
     Returns a tuple of a list of testbench files, and a dictionary
     of parsed objects.
     """
+    if wrapper_name is None:
+        wrapper_name = top_entity
     dut_fns = filenames[:]
     if dut_directory is None:
         dut_directory = directory
@@ -450,7 +467,9 @@ def prepare_files(
         ftb = make_filetestbench(resolved_entity, add_double_wrapper, use_vunit=use_vunit,
                                  default_generics=default_generics,
                                  default_output_path=default_output_path, use_pipes=use_pipes,
-                                 slv_interface=slv_interface)
+                                 slv_interface=slv_interface, dut_name=wrapper_name,
+                                 extra_logic=extra_logic, extra_definitions=extra_definitions,
+                                 )
     ftb_fn = os.path.join(directory, '{}_tb.vhd'.format(
         resolved_entity.identifier))
     with open(ftb_fn, 'w') as f:

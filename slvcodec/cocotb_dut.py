@@ -9,10 +9,12 @@ This file provides functions to modify the cocotb 'dut' object.
 
 import os
 import json
+import collections
 
 from cocotb_test import run
 
 from slvcodec import typs, filetestbench_generator, flatten_generator
+from slvcodec import cocotb_wrapper, conversions
 
 
 def set_value(dut, base_name, mapping, value, separator):
@@ -73,7 +75,24 @@ def get_value(dut, base_name, mapping, separator):
     return value
 
 
-def apply_mapping(dut, mapping, separator):
+@cocotb_wrapper.coroutine
+async def make_input_and_output_files(
+        clk, dut, mapping, input_port_names, output_port_names,
+        datainfilename, dataoutfilename):
+    with open(datainfilename, 'w') as inf:
+        with open(dataoutfilename, 'w') as outf:
+            while True:
+                # write inputs
+                await cocotb_wrapper.triggers.RisingEdge(clk)
+                input_line = serialize(mapping, dut, names=input_port_names)
+                inf.write(input_line + '\n')
+                # write outputs
+                await cocotb_wrapper.triggers.ReadOnly()
+                output_line = serialize(mapping, dut, names=output_port_names)
+                outf.write(output_line + '\n')
+
+
+def apply_mapping(dut, mapping, separator, input_file=None, output_file=None):
     """
     Adds 'Bundle' objects to the dut that represent compound ports.
     This allows us to treat the dut as if the ports have not been flattened.
@@ -169,7 +188,7 @@ def get_entity_mapping(entity, generics, port_names=None, clock_name='clk'):
                      The default is to get all of them.
        `clock_name`: The clock is excluded from the mapping.
     """
-    mapping = {}
+    mapping = collections.OrderedDict()
     ports = entity.ports
     for port_name, port in ports.items():
         if port_name == clock_name:
@@ -181,6 +200,25 @@ def get_entity_mapping(entity, generics, port_names=None, clock_name='clk'):
     return mapping
 
 
+def serialize(mapping, dut, names=None):
+    s = ''
+    if isinstance(mapping, collections.OrderedDict):
+        for name, submap in reversed(mapping.items()):
+            if (names is None) or (name in names):
+                s += serialize(submap, getattr(dut, name))
+    elif isinstance(mapping, list):
+        for index, submap in reversed(enumerate(mapping)):
+            s += serialize(submap, dut[index])
+    elif isinstance(mapping, str):
+        assert mapping[0] == 'u'
+        size = int(mapping[1:])
+        assert len(str(dut)) == size 
+        s += str(dut)
+    else:
+        raise ValueError('Unknown mapping type')
+    return s
+
+
 def get_mapping(typ, generics):
     """
     Creates the `mapping` object for a VHDL type.
@@ -189,15 +227,16 @@ def get_mapping(typ, generics):
        `typ`: A typ object produced by parsing VHDL files.
        `generics`: The generic parameters we're going to use.
     """
-    mapping = None
     if hasattr(typ, 'names_and_subtypes'):
-        mapping = {}
+        mapping = collections.OrderedDict()
         for name, sub_type in typ.names_and_subtypes:
             mapping[name] = get_mapping(sub_type, generics)
     elif hasattr(typ, 'unconstrained_type'):
         size = typs.apply_generics(generics, typ.size)
         if isinstance(typ.unconstrained_type.subtype, typs.StdLogic):
-            mapping = None
+            mapping = 'u' + str(size) # 'u' is for Unsigned
         else:
             mapping = [get_mapping(typ.unconstrained_type.subtype, generics)] * size
+    else:
+        mapping = 'u1'
     return mapping
