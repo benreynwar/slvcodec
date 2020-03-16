@@ -92,6 +92,18 @@ async def make_input_and_output_files(
                 outf.write(output_line + '\n')
 
 
+def fork_make_input_and_output_files(directory, clk, dut, mapping, params):
+    input_port_names = params.get('input_port_names', [])
+    output_port_names = params.get('output_port_names', [])
+    if input_port_names and output_port_names:
+        cocotb_wrapper.fork(make_input_and_output_files(
+            clk=clk, dut=dut, mapping=mapping,
+            input_port_names=input_port_names, output_port_names=output_port_names,
+            datainfilename=os.path.join(directory, 'indata.dat'),
+            dataoutfilename=os.path.join(directory, 'outdata.dat'),
+        ))
+
+
 def apply_mapping(dut, mapping, separator, input_file=None, output_file=None):
     """
     Adds 'Bundle' objects to the dut that represent compound ports.
