@@ -87,7 +87,7 @@ def get_constraint_bounds(constraint):
         \s*(?P<range_left>.+?)
         \s+(?P<direction>to|downto)\s+
         (?P<range_right>.+?)\s*
-        \)\s*""", re.MULTILINE | re.IGNORECASE | re.VERBOSE | re.DOTALL)
+        \)\s*$""", re.MULTILINE | re.IGNORECASE | re.VERBOSE | re.DOTALL)
     match = _constrained_range_re.match(constraint)
     if match:
         gd = match.groupdict()
