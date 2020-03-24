@@ -82,12 +82,10 @@ async def make_input_and_output_files(
     with open(datainfilename, 'w') as inf:
         with open(dataoutfilename, 'w') as outf:
             while True:
-                # write inputs
                 await cocotb_wrapper.triggers.RisingEdge(clk)
+                await cocotb_wrapper.triggers.ReadOnly()
                 input_line = serialize(mapping, dut, names=input_port_names)
                 inf.write(input_line + '\n')
-                # write outputs
-                await cocotb_wrapper.triggers.ReadOnly()
                 output_line = serialize(mapping, dut, names=output_port_names)
                 outf.write(output_line + '\n')
 
