@@ -532,18 +532,28 @@ def process_files(directory, filenames, entity_names_to_resolve=None):
 
 
 def add_slvcodec_files_inner(directory, filenames, packages, filename_to_package_name):
+    initial_basenames = {os.path.basename(fn): fn for fn in filenames}
     combined_filenames = [os.path.join(config.vhdldir, 'slvcodec.vhd')]
+    combined_basenames = [os.path.basename(fn) for fn in combined_filenames]
     for fn in filenames:
+        bn = os.path.basename(fn)
         if fn not in combined_filenames:
             combined_filenames.append(fn)
+            if bn in combined_basenames:
+                logger.warning('Two files with the same name: {}'.format(bn))
+            else:
+                combined_basenames.append(bn)
         if (fn in filename_to_package_name) and (fn[-len('slvcodec.vhd'):] != 'slvcodec.vhd'):
             package_name = filename_to_package_name[fn]
-            slvcodec_pkg = package_generator.make_slvcodec_package(packages[package_name])
-            slvcodec_package_filename = os.path.join(
-                directory, '{}_slvcodec.vhd'.format(package_name))
-            with open(slvcodec_package_filename, 'w') as f:
-                f.write(slvcodec_pkg)
-            combined_filenames.append(slvcodec_package_filename)
+            slvcodec_basename = '{}_slvcodec.vhd'.format(package_name)
+            if slvcodec_basename not in initial_basenames:
+                slvcodec_pkg = package_generator.make_slvcodec_package(packages[package_name])
+                slvcodec_package_filename = os.path.join(directory, slvcodec_basename)
+                with open(slvcodec_package_filename, 'w') as f:
+                    f.write(slvcodec_pkg)
+                combined_filenames.append(slvcodec_package_filename)
+            else:
+                combined_filenames.append(initial_basenames[slvcodec_basename])
     return combined_filenames
 
 
