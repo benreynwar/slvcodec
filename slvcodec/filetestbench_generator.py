@@ -142,7 +142,7 @@ def typ_to_slv(typ):
     if isinstance(typ, typs.StdLogic):
         new_typ = typ
     else:
-        new_typ = typs.ConstrainedStdLogicVector(identifier=None, size=typ.size.value())
+        new_typ = typs.ConstrainedStdLogicVector(identifier=None, size=typ.width)
     return new_typ
 
 
