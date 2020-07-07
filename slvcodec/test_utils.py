@@ -10,8 +10,10 @@ import logging
 import random
 import inspect
 import json
+import sys
+import subprocess
+import cocotb as true_cocotb
 
-from cocotb_test import run
 from slvcodec import add_slvcodec_files
 from slvcodec import filetestbench_generator, flatten_generator
 from slvcodec import config, fusesoc_wrapper, event, cocotb_dut
@@ -122,7 +124,7 @@ def register_test_with_vunit(
 
 def get_coretest_files(test, test_output_directory, param_set,
                        add_double_wrapper, default_generics, fusesoc_config_filename,
-                       generate_iteratively):
+                       generate_iteratively, verbose=False):
     generated_index = 0
     generic_sets = param_set['generic_sets']
     top_params = param_set['top_params']
@@ -142,6 +144,7 @@ def get_coretest_files(test, test_output_directory, param_set,
             top_name=test['entity_name'],
             config_filename=fusesoc_config_filename,
             additional_generator=add_slvcodec_files,
+            verbose=verbose,
             )
     else:
         filenames = fusesoc_wrapper.generate_core(
@@ -149,6 +152,8 @@ def get_coretest_files(test, test_output_directory, param_set,
             core_name=test['core_name'],
             parameters=top_params,
             config_filename=fusesoc_config_filename,
+            additional_generator=add_slvcodec_files,
+            verbose=verbose,
             )
         filenames = add_slvcodec_files(generation_directory, filenames)
     ftb_directory = os.path.join(generation_directory, 'ftb')
@@ -170,7 +175,7 @@ def get_coretest_files(test, test_output_directory, param_set,
 
 def register_coretest_with_vunit(
         vu, test, test_output_directory, add_double_wrapper=False, default_generics={},
-        fusesoc_config_filename=None, generate_iteratively=False):
+        fusesoc_config_filename=None, generate_iteratively=False, verbose=False):
     '''
     Register a test with vunit.
     Args:
@@ -203,7 +208,7 @@ def register_coretest_with_vunit(
         filenames, combined_filenames, resolved = get_coretest_files(
             test, test_output_directory, param_set,
             add_double_wrapper, default_generics, fusesoc_config_filename,
-            generate_iteratively)
+            generate_iteratively, verbose=verbose)
         register_rawtest_with_vunit(
             vu=vu,
             filenames=combined_filenames,
@@ -535,7 +540,7 @@ def run_coretest_with_pipes(
 
 def run_coretest_with_cocotb(
         test, test_output_directory, fusesoc_config_filename=None, generate_iteratively=False,
-        wave=False, write_input_output_files=False,
+        wave=False, write_input_output_files=False, verbose=False,
     ):
     '''
     Run a test with cocotb.
@@ -548,6 +553,7 @@ def run_coretest_with_cocotb(
         `top_entity`: The name of the entity to test.
         `test_module_name`: A cocotb test module name.
     '''
+    print('start run_coretest_with_cocotb')
     if 'param_sets' in test:
         param_sets = test['param_sets']
     else:
@@ -574,6 +580,7 @@ def run_coretest_with_cocotb(
 
         if generate_iteratively:
             generic_sets = param_set['generic_sets']
+            print('generating iteratively')
             filenames = fusesoc_wrapper.generate_core_iteratively(
                 core_name=test['core_name'],
                 work_root=generation_directory,
@@ -582,6 +589,7 @@ def run_coretest_with_cocotb(
                 top_name=test['entity_name'],
                 config_filename=fusesoc_config_filename,
                 additional_generator=add_slvcodec_files,
+                verbose=verbose,
                 )
         else:
             filenames = fusesoc_wrapper.generate_core(
@@ -589,6 +597,7 @@ def run_coretest_with_cocotb(
                 core_name=test['core_name'],
                 parameters=top_params,
                 config_filename=fusesoc_config_filename,
+                verbose=verbose,
                 )
             filenames = add_slvcodec_files(generation_directory, filenames)
         for generics in param_set['generic_sets']:
@@ -650,7 +659,7 @@ def run_with_cocotb(generation_directory, filenames, entity_name, generics, test
         simulation_args = []
     pwd = os.getcwd()
     os.chdir(generation_directory)
-    run.run(
+    run(
         vhdl_sources=final_filenames,
         simulation_args=simulation_args,
         toplevel=top_name,
@@ -658,6 +667,40 @@ def run_with_cocotb(generation_directory, filenames, entity_name, generics, test
         extra_env={'test_params_filename': test_params_filename},
         )
     os.chdir(pwd)
+
+
+def run(vhdl_sources, simulation_args, toplevel, module, extra_env):
+    lib_dir = os.path.join(os.path.dirname(true_cocotb.__file__), 'libs')
+    shared_lib = os.path.join(lib_dir, 'libcocotbvpi_ghdl.so')
+    ghdl_lib_dir = os.path.join(lib_dir, 'ghdl')
+    run_dir = ''
+
+    for key, value in extra_env.items():
+        os.environ[key] = value
+
+    lib_dir_sep = os.pathsep + ghdl_lib_dir + os.pathsep
+    if lib_dir_sep not in os.environ["PATH"]:  # without checking will add forever casing error
+        os.environ["PATH"] += lib_dir_sep
+
+    python_path = os.pathsep.join(sys.path)
+    os.environ["PYTHONPATH"] = os.pathsep + ghdl_lib_dir
+
+    if run_dir:
+        os.environ["PYTHONPATH"] += os.pathsep + run_dir
+    os.environ["PYTHONPATH"] += os.pathsep + python_path
+
+    os.environ["TOPLEVEL"] = toplevel
+    os.environ["COCOTB_SIM"] = "1"
+    os.environ["MODULE"] = module
+    cmds = [['ghdl', '-i', filename] for filename in vhdl_sources]
+    cmds += [
+        ['ghdl', '-m', toplevel],
+        ['ghdl', '-r', toplevel, '--vpi='+shared_lib] + simulation_args,
+        ]
+    for cmd in cmds:
+        logger.info("Running command: "+" ".join(cmd))
+        retval = subprocess.call(cmd)
+        assert retval == 0
 
 
 @cocotb.coroutine

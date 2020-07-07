@@ -11,8 +11,6 @@ import os
 import json
 import collections
 
-from cocotb_test import run
-
 from slvcodec import typs, filetestbench_generator, flatten_generator
 from slvcodec import cocotb_wrapper, conversions
 
