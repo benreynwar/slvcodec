@@ -31,6 +31,15 @@ class TaskWrapper:
         return self.task._finished
 
 
+class FakeTaskWrapper:
+
+    def kill(self):
+        pass
+
+    def done(self):
+        return True
+
+
 class TaskHelper:
 
     def __init__(self, name=None):
@@ -63,6 +72,8 @@ class TaskHelper:
             coroutine = needs_helper(forked_helper)
             task = cocotb.fork(coroutine)
             return TaskWrapper(forked_helper, task)
+        else:
+            return FakeTaskWrapper()
 
     @cocotb.coroutine
     async def add(self, needs_helper, name=None):
