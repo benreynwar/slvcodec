@@ -28,7 +28,7 @@ setup(
         'pytest',
         'vunit-hdl',
         'pyyaml',
-        'cocotb',
+        'cocotb>=1.4.0rc1',
         'fusesoc',
     ],
 )

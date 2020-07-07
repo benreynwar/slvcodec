@@ -672,18 +672,17 @@ def run_with_cocotb(generation_directory, filenames, entity_name, generics, test
 def run(vhdl_sources, simulation_args, toplevel, module, extra_env):
     lib_dir = os.path.join(os.path.dirname(true_cocotb.__file__), 'libs')
     shared_lib = os.path.join(lib_dir, 'libcocotbvpi_ghdl.so')
-    ghdl_lib_dir = os.path.join(lib_dir, 'ghdl')
     run_dir = ''
 
     for key, value in extra_env.items():
         os.environ[key] = value
 
-    lib_dir_sep = os.pathsep + ghdl_lib_dir + os.pathsep
+    lib_dir_sep = os.pathsep + lib_dir + os.pathsep
     if lib_dir_sep not in os.environ["PATH"]:  # without checking will add forever casing error
         os.environ["PATH"] += lib_dir_sep
 
     python_path = os.pathsep.join(sys.path)
-    os.environ["PYTHONPATH"] = os.pathsep + ghdl_lib_dir
+    os.environ["PYTHONPATH"] = os.pathsep + lib_dir
 
     if run_dir:
         os.environ["PYTHONPATH"] += os.pathsep + run_dir
