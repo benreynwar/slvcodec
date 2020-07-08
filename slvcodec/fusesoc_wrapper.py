@@ -78,7 +78,7 @@ def generate_core(working_directory, core_name, parameters, config_filename=None
         cmd += ['--verbose']
     if config_filename:
         cmd += ['--config', config_filename]
-    cmd += ['run', '--tool', tool, '--setup', core_name]
+    cmd += ['run', '--target', 'default', '--tool', tool, '--setup', core_name]
 
     subprocess.call(cmd, cwd=working_directory)
 
@@ -96,9 +96,16 @@ def generate_core(working_directory, core_name, parameters, config_filename=None
     # Sometimes there seem to be repeats
     # This is either a bug in fusesoc or in our core files.
     # Filter them out.
+    # FIXME: This is an ugly patch over a nasty problem.
     filtered_filenames = []
+    basenames = {}
     for fn in filenames:
+        bn = os.path.basename(fn)
         if fn not in filtered_filenames:
+            if bn in basenames:
+                logger.warning('Two files with the same name: {}, {}'.format(fn, basenames[bn]))
+            else:
+                basenames[bn] = fn
             filtered_filenames.append(fn)
 
     if old_params is not None:
@@ -205,7 +212,7 @@ def run(work_root, top_name, all_top_generics, generator_d):
 
 def compile_elab_and_run(core_name, work_root, all_top_generics, top_params, top_name,
                          generator_d, additional_generator=None, config_filename=None,
-                         other_files=None):
+                         other_files=None, verbose=False):
     '''
     Run the generators, compile and elaborate the files, and run ghdl
     to see if any of the generators were missing generics.
@@ -213,7 +220,7 @@ def compile_elab_and_run(core_name, work_root, all_top_generics, top_params, top
     if other_files is None:
         other_files = []
     file_names = generate_core(work_root, core_name, top_params, config_filename=config_filename,
-                               tool='vivado')
+                               tool='vivado', verbose=verbose)
     if additional_generator is not None:
         file_names = additional_generator(work_root, file_names)
     compile_src_files(work_root, other_files + file_names)
@@ -227,9 +234,10 @@ def compile_elab_and_run(core_name, work_root, all_top_generics, top_params, top
 
 
 def generate_core_iteratively(core_name, work_root, all_top_generics, top_params, top_name,
-                              additional_generator=None, config_filename=None, other_files=None):
+                              additional_generator=None, config_filename=None, other_files=None,
+                              verbose=False):
     found_new_parameters = True
-    elaboration_params = {'dummy': 'fish'}
+    elaboration_params = {}
     top_params['elaboration_params'] = elaboration_params
     iteration_count = 0
     while found_new_parameters:
@@ -238,7 +246,7 @@ def generate_core_iteratively(core_name, work_root, all_top_generics, top_params
         filenames, found_new_parameters = compile_elab_and_run(
             core_name, work_root, all_top_generics, top_params, top_name,
             elaboration_params, additional_generator, config_filename,
-            other_files=other_files,
+            other_files=other_files, verbose=verbose,
         )
         iteration_count += 1
     return filenames
