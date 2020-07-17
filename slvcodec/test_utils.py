@@ -12,6 +12,9 @@ import inspect
 import json
 import sys
 import subprocess
+import tempfile
+
+from xml.etree import cElementTree as ET
 import cocotb as true_cocotb
 
 from slvcodec import add_slvcodec_files
@@ -691,15 +694,27 @@ def run(vhdl_sources, simulation_args, toplevel, module, extra_env):
     os.environ["TOPLEVEL"] = toplevel
     os.environ["COCOTB_SIM"] = "1"
     os.environ["MODULE"] = module
+    results_xml_file = tempfile.mkstemp('_cocotb_results')[1]
+    os.environ["COCOTB_RESULTS_FILE"] = results_xml_file
     cmds = [['ghdl', '-i', filename] for filename in vhdl_sources]
     cmds += [
         ['ghdl', '-m', toplevel],
         ['ghdl', '-r', toplevel, '--vpi='+shared_lib] + simulation_args,
         ]
     for cmd in cmds:
-        logger.info("Running command: "+" ".join(cmd))
         retval = subprocess.call(cmd)
         assert retval == 0
+    # Check that the produced xml file by cocotb.
+
+    tree = ET.parse(results_xml_file)
+    for testsuite in tree.iter('testsuite'):
+        for testcase in testsuite.iter('testcase'):
+            for failure in testcase.iter("failure"):
+                msg = '{} class="{}" test="{}" error={}'.format(
+                    failure.get('message'), testcase.get('classname'),
+                    testcase.get('name'), failure.get('stdout'))
+                raise Exception(msg)
+    os.remove(results_xml_file)
 
 
 @cocotb.coroutine
