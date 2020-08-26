@@ -157,9 +157,14 @@ class Bundle:
                     self.__dict__[key] = Bundle(name, dut, sub_mapping, separator)
                 else:
                     if not hasattr(dut, name):
-                        import pdb
-                        pdb.set_trace()
-                    self.__dict__[key] = getattr(dut, name)
+                        if sub_mapping == 'u0':
+                            # The wire has 0 length so it's possibly been removed.
+                            self.__dict__[key] = None
+                        else:
+                            import pdb
+                            pdb.set_trace()
+                    else:
+                        self.__dict__[key] = getattr(dut, name)
         elif isinstance(mapping, (tuple, list)):
             for index, sub_mapping in enumerate(mapping):
                 name = base_name + separator + str(index)
