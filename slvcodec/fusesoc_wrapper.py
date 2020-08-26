@@ -158,8 +158,9 @@ def run_single(work_root, top_name, top_generics):
                          errormsg="Simulation failed").run()
     except RuntimeError as error:
         with open(stdout_fn, 'r') as stdout_f:
-            for line in stdout_f:
-                if 'ghdl:error' in line:
+            lines = list(stdout_f)
+            for line_index, line in enumerate(lines):
+                if ('ghdl:error' in line) or ('assertion failure' in line):
                     logger.error(line)
                 else:
                     logger.debug(line)
