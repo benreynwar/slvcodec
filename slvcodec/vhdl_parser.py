@@ -230,7 +230,7 @@ def resolve_entities_and_packages(entities, packages, must_resolve=True):
     return resolved_entities, resolved_packages
 
 
-def parse_and_resolve_files(filenames, must_resolve=True):
+def parse_and_resolve_files(filenames, must_resolve=True, ignore_parse_exceptions=False):
     '''
     Takes a list of filenames,
     parses them with the VUnit parser
@@ -244,9 +244,15 @@ def parse_and_resolve_files(filenames, must_resolve=True):
     all_entities = []
     all_packages = []
     for filename in filenames:
-        entities, packages = parse_file(filename)
-        all_entities += entities
-        all_packages += packages
+        try:
+            entities, packages = parse_file(filename)
+            all_entities += entities
+            all_packages += packages
+        except Exception as e:
+            if ignore_parse_exceptions:
+                logger.warning('Failed to parse {}.  Got error {}'.format(filename, str(e)))
+            else:
+                raise(e)
     resolved_entities, resolved_packages = resolve_entities_and_packages(
         entities=all_entities, packages=all_packages, must_resolve=must_resolve)
     return resolved_entities, resolved_packages

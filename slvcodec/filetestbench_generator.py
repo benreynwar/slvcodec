@@ -520,8 +520,12 @@ def process_files(directory, filenames, entity_names_to_resolve=None):
         if filename in processed_filenames:
             continue
         processed_filenames.add(filename)
-        new_parsed_entities, new_parsed_packages = vhdl_parser.parse_file(filename)
-        parsed_packages += new_parsed_packages
+        try:
+            new_parsed_entities, new_parsed_packages = vhdl_parser.parse_file(filename)
+            parsed_packages += new_parsed_packages
+        except Exception as e:
+            logger.error('Catching exception: {}'.format(str(e)))
+            logger.error('Failed to parse file: {}'.format(filename))
         if new_parsed_packages:
             assert len(new_parsed_packages) == 1
             filename_to_package_name[filename] = new_parsed_packages[0].identifier
