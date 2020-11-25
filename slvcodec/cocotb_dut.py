@@ -73,7 +73,45 @@ def get_value(dut, base_name, mapping, separator):
         value = [get_value(dut, base_name + separator + str(sub_index), sub_mapping, separator)
                  for sub_index, sub_mapping in enumerate(mapping)]
     else:
-        value = getattr(dut, base_name).value
+        if not hasattr(dut, base_name):
+            if mapping == 'u0':
+                # A data element of size 0 bits is represented by None.
+                value = None
+            else:
+                raise Exception('Missing {} signal in flattened entity.'.format(base_name))
+        else:
+            value = getattr(dut, base_name).value
+    return value
+
+
+def get_width(dut, base_name, mapping, separator):
+    """
+    Used to retrieve the number of bits in a compound port in the 'dut'.
+    Args:
+       `dut`: The cocotb interface to the tested entity.
+       `base_name`: A path to the position in the port hierarchy that we are modifying.
+                    (e.g. myarray_0_key)
+       `mapping`: A representation of the structure of the position in the port hierarchy.
+                  (e.g. [{a: None, b: None}, {a: None, b: None}, {a: None, b: None}] for a list
+                  of records with length 3.)  None is useful to represent types that are not
+                  arrays or records.
+       `separator`: The separator that is used when flattening ports.
+                    (i.e. '_' so that myarray(0).a becomes myarray_0_a)
+    """
+    if isinstance(mapping, dict):
+        value = sum(get_width(dut, base_name + separator + sub_key, sub_mapping, separator)
+                    for sub_key, sub_mapping in mapping.items())
+    elif isinstance(mapping, (list, tuple)):
+        value = sum(get_width(dut, base_name + separator + str(sub_index), sub_mapping, separator)
+                    for sub_index, sub_mapping in enumerate(mapping))
+    else:
+        if not hasattr(dut, base_name):
+            if mapping == 'u0':
+                value = 0
+            else:
+                raise Exception('Missing {} signal in flattened entity.'.format(base_name))
+        else:
+            value = getattr(dut, base_name).value.n_bits
     return value
 
 
@@ -183,6 +221,10 @@ class Bundle:
     def value(self):
         value = get_value(self.dut, self.base_name, self.mapping, self.separator)
         return value
+
+    def get_width(self):
+        width = get_width(self.dut, self.base_name, self.mapping, self.separator)
+        return width
 
     @value.setter
     def set_value(self, value):
