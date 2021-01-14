@@ -40,12 +40,47 @@ class FakeTaskWrapper:
         return True
 
 
+class KillableEvent:
+
+    def __init__(self, on_finish):
+        self.event = triggers.Event()
+        self._killed = False
+        self.on_finish = on_finish
+
+    def kill(self):
+        self._killed = True
+
+    async def wait(self):
+        val = await self.event.wait()
+        if self.killed:
+            raise KilledError
+        self.on_finish(self)
+        return val
+
+    def set(self, value):
+        self.event.set(value)
+        self.data = value
+
+    @property
+    def killed(self):
+        return self._killed
+
+
 class TaskHelper:
 
     def __init__(self, name=None):
         self.child_helpers = []
+        self.events = set()
         self._killed = False
         self.name = name
+
+    def remove_event(self, event):
+        self.events.remove(event)
+
+    def Event(self):
+        event = KillableEvent(on_finish=self.remove_event)
+        self.events.add(event)
+        return event
 
     @cocotb.coroutine
     async def RisingEdge(self, signal, kill_callback=None):
@@ -92,10 +127,14 @@ class TaskHelper:
         self._killed = True
         for helper in self.child_helpers:
             helper.kill(prefix+'--')
+        for event in self.events:
+            event.kill()
 
     def finish(self):
         for helper in self.child_helpers:
             helper.kill()
+        for event in self.events:
+            event.kill()
 
     @property
     def killed(self):
