@@ -647,11 +647,11 @@ def run_with_cocotb(generation_directory, filenames, entity_name, generics, test
         'test_params': test_params,
         'filenames': filenames,
         'top_params': top_params,
+        'input_port_names': input_port_names,
+        'output_port_names': output_port_names,
         }
     if write_input_output_files:
         params.update({
-            'input_port_names': input_port_names,
-            'output_port_names': output_port_names,
             'directory': generation_directory,
             })
     with open(test_params_filename, 'w') as f:
