@@ -45,11 +45,14 @@ def set_value(dut, base_name, mapping, value, separator):
             set_value(dut, base_name + separator + str(sub_index),
                       mapping[sub_index], sub_value, separator)
     else:
-        attribute = getattr(dut, base_name)
-        # Check that we're not trying to assign something to a bundle
-        # that isn't a list of dict.
-        assert not isinstance(attribute, Bundle)
-        attribute <= value
+        if mapping != 'u0':
+            attribute = getattr(dut, base_name)
+            # Check that we're not trying to assign something to a bundle
+            # that isn't a list of dict.
+            assert not isinstance(attribute, Bundle)
+            attribute <= value
+        else:
+            assert value in (0, None)
 
 
 def get_value(dut, base_name, mapping, separator):

@@ -30,6 +30,15 @@ class TaskWrapper:
     def done(self):
         return self.task._finished
 
+    @property
+    def _finished(self):
+        return self.task._finished
+
+    @property
+    def _outcome(self):
+        return self.task._outcome
+        
+
 
 class FakeTaskWrapper:
 
@@ -81,6 +90,10 @@ class TaskHelper:
         event = KillableEvent(on_finish=self.remove_event)
         self.events.add(event)
         return event
+
+    def Join(self, task):
+        return triggers.Join(task.task)
+        
 
     @cocotb.coroutine
     async def RisingEdge(self, signal, kill_callback=None):
