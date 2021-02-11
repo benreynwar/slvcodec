@@ -37,16 +37,6 @@ class TaskWrapper:
     @property
     def _outcome(self):
         return self.task._outcome
-        
-
-
-class FakeTaskWrapper:
-
-    def kill(self):
-        pass
-
-    def done(self):
-        return True
 
 
 class KillableEvent:
@@ -93,7 +83,6 @@ class TaskHelper:
 
     def Join(self, task):
         return triggers.Join(task.task)
-        
 
     @cocotb.coroutine
     async def RisingEdge(self, signal, kill_callback=None):
@@ -121,7 +110,7 @@ class TaskHelper:
             task = cocotb.fork(coroutine)
             return TaskWrapper(forked_helper, task)
         else:
-            return FakeTaskWrapper()
+            raise KilledError
 
     @cocotb.coroutine
     async def add(self, needs_helper, name=None):
@@ -132,9 +121,12 @@ class TaskHelper:
             self.name = name
             new_helper = TaskHelper(name=name)
             self.child_helpers.append(new_helper)
-            await needs_helper(new_helper)
+            value = await needs_helper(new_helper)
             if self.killed:
                 raise KilledError
+            return value
+        else:
+            raise KilledError
 
     def kill(self, prefix=''):
         self._killed = True
@@ -160,7 +152,7 @@ def killable(coroutine):
         @wraps(coroutine)
         async def wrapper(helper):
             try:
-                await coroutine(helper, *args, **kwargs)
+                return await coroutine(helper, *args, **kwargs)
                 helper.finish()
             except KilledError:
                 pass
