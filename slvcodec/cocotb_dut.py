@@ -134,12 +134,13 @@ async def make_input_and_output_files(
                 outf.write(output_line + '\n')
 
 
-def fork_make_input_and_output_files(directory, clk, dut, mapping, params, override_fork):
+def fork_make_input_and_output_files(directory, clk, dut, mapping, params,
+                                     override_fork=None):
     input_port_names = params.get('input_port_names', [])
     output_port_names = params.get('output_port_names', [])
     used_fork = cocotb.fork if override_fork is None else override_fork
     if input_port_names and output_port_names:
-        used_fork.fork(make_input_and_output_files(
+        used_fork(make_input_and_output_files(
             clk=clk, dut=dut, mapping=mapping,
             input_port_names=input_port_names, output_port_names=output_port_names,
             datainfilename=os.path.join(directory, 'indata.dat'),
