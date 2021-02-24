@@ -8,11 +8,12 @@ This file provides functions to modify the cocotb 'dut' object.
 """
 
 import os
-import json
 import collections
 
-from slvcodec import typs, filetestbench_generator, flatten_generator
-from slvcodec import cocotb_wrapper, conversions
+import cocotb
+from cocotb import triggers
+
+from slvcodec import typs
 
 
 def set_value(dut, base_name, mapping, value, separator):
@@ -118,26 +119,27 @@ def get_width(dut, base_name, mapping, separator):
     return value
 
 
-@cocotb_wrapper.coroutine
 async def make_input_and_output_files(
         clk, dut, mapping, input_port_names, output_port_names,
-        datainfilename, dataoutfilename):
+        datainfilename, dataoutfilename, override_triggers=None):
+    used_triggers = triggers if override_triggers is None else override_triggers
     with open(datainfilename, 'w') as inf:
         with open(dataoutfilename, 'w') as outf:
             while True:
-                await cocotb_wrapper.triggers.RisingEdge(clk)
-                await cocotb_wrapper.triggers.ReadOnly()
+                await used_triggers.RisingEdge(clk)
+                await used_triggers.ReadOnly()
                 input_line = serialize(mapping, dut, names=input_port_names)
                 inf.write(input_line + '\n')
                 output_line = serialize(mapping, dut, names=output_port_names)
                 outf.write(output_line + '\n')
 
 
-def fork_make_input_and_output_files(directory, clk, dut, mapping, params):
+def fork_make_input_and_output_files(directory, clk, dut, mapping, params, override_fork):
     input_port_names = params.get('input_port_names', [])
     output_port_names = params.get('output_port_names', [])
+    used_fork = cocotb.fork if override_fork is None else override_fork
     if input_port_names and output_port_names:
-        cocotb_wrapper.fork(make_input_and_output_files(
+        used_fork.fork(make_input_and_output_files(
             clk=clk, dut=dut, mapping=mapping,
             input_port_names=input_port_names, output_port_names=output_port_names,
             datainfilename=os.path.join(directory, 'indata.dat'),
