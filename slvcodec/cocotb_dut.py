@@ -13,7 +13,7 @@ import collections
 import cocotb
 from cocotb import triggers
 
-from slvcodec import typs
+from slvcodec import typs, logceil_1to0
 
 
 def set_value(dut, base_name, mapping, value, separator):
@@ -51,6 +51,7 @@ def set_value(dut, base_name, mapping, value, separator):
             # Check that we're not trying to assign something to a bundle
             # that isn't a list of dict.
             assert not isinstance(attribute, Bundle)
+            assert attribute.value.n_bits >= logceil_1to0(value)
             attribute <= value
         else:
             assert value in (0, None)
@@ -215,7 +216,14 @@ class Bundle:
                 if isinstance(sub_mapping, (dict, tuple, list)):
                     self.elements.append(Bundle(name, dut, sub_mapping, separator))
                 else:
-                    self.elements.append(getattr(dut, name))
+                    if not hasattr(dut, name):
+                        if sub_mapping == 'u0':
+                            self.elements.append(None)
+                        else:
+                            import pdb
+                            pdb.set_trace()
+                    else:
+                        self.elements.append(getattr(dut, name))
 
     def __getitem__(self, index):
         return self.elements[index]
