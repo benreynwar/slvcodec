@@ -1,6 +1,7 @@
 import os
 import subprocess
 import logging
+import filecmp
 
 import yaml
 
@@ -104,9 +105,12 @@ def generate_core(working_directory, core_name, parameters, config_filename=None
         if fn not in filtered_filenames:
             if bn in basenames:
                 logger.warning('Two files with the same name: {}, {}'.format(fn, basenames[bn]))
+                if not filecmp.cmp(fn, basenames[bn]):
+                    logger.warning('Two files with the same name but different contents: {}, {}'.format(fn, basenames[bn]))
+                    filtered_filenames.append(fn)
             else:
                 basenames[bn] = fn
-            filtered_filenames.append(fn)
+                filtered_filenames.append(fn)
 
     if old_params is not None:
         os.environ['FUSESOC_TOP_PARAMS'] = old_params
