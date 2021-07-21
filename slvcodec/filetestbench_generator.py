@@ -526,6 +526,8 @@ def process_files(directory, filenames, entity_names_to_resolve=None):
         except Exception as e:
             logger.error('Catching exception: {}'.format(str(e)))
             logger.error('Failed to parse file: {}'.format(filename))
+            new_parsed_entities = []
+            new_parsed_packages = []
         if new_parsed_packages:
             assert len(new_parsed_packages) == 1
             filename_to_package_name[filename] = new_parsed_packages[0].identifier
