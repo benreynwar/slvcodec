@@ -145,7 +145,10 @@ def make_slvcodec_package(pkg):
     '''
     all_declarations = []
     all_definitions = []
-    for typ in pkg.types.values():
+    type_keys = list(pkg.types.keys())
+    type_keys.sort()
+    for typ_key in type_keys:
+        typ = pkg.types[typ_key]
         declarations, definitions = make_declarations_and_definitions(typ)
         all_declarations.append(declarations)
         all_definitions.append(definitions)
