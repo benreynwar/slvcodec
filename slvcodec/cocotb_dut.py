@@ -241,7 +241,7 @@ class Bundle:
         return width
 
     @value.setter
-    def set_value(self, value):
+    def value(self, value):
         set_value(self.dut, self.base_name, self.mapping, value, self.separator)
 
     def __eq__(self, other):
