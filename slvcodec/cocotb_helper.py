@@ -84,7 +84,6 @@ class TaskHelper:
     def Join(self, task):
         return triggers.Join(task.task)
 
-    @cocotb.coroutine
     async def RisingEdge(self, signal, kill_callback=None):
         await triggers.RisingEdge(signal)
         if self.killed:
@@ -92,7 +91,6 @@ class TaskHelper:
                 kill_callback()
             raise KilledError
 
-    @cocotb.coroutine
     async def ReadOnly(self, kill_callback=None):
         await triggers.ReadOnly()
         if self.killed:
@@ -112,7 +110,6 @@ class TaskHelper:
         else:
             raise KilledError
 
-    @cocotb.coroutine
     async def add(self, needs_helper, name=None):
         if not self._killed:
             assert not self._killed
@@ -148,7 +145,6 @@ class TaskHelper:
 
 def killable(coroutine):
     def needs_helper(*args, **kwargs):
-        @cocotb.coroutine
         @wraps(coroutine)
         async def wrapper(helper):
             try:
