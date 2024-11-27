@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use work.slvcodec.all;
 {{use_clauses}}
-use work.setgenerics_pkg.all;
+use work.{{wrapped_name}}_setgenerics_pkg.all;
 
 entity {{wrapper_name}} is
   port ({% for port in wrapper_ports %}

@@ -69,6 +69,7 @@ def make_generics_wrapper(enty, generics, wrapped_name, ports_to_remove=None, fo
     package = template.render(
         use_clauses=use_clauses,
         generics=constant_generics,
+        entity_name=enty.identifier,
         )
     return wrapper, package
 
@@ -589,7 +590,7 @@ def make_add_slvcodec_files_and_setgenerics_wrapper(
         with open(package_filename, 'w') as f:
             f.write(setgenerics_pkg)
         with open(package_slvcodec_filename, 'w') as f:
-            f.write('''package setgenerics_pkg_slvcodec is
+            f.write(f'''package {old_name}_setgenerics_pkg_slvcodec is
             end package;''')
         combined_filenames += [package_filename, package_slvcodec_filename, wrapper_filename]
         return combined_filenames
