@@ -62,7 +62,7 @@ def set_fusesoc_top_params(top_params, top_params_filename=None):
 def get_fusesoc_top_params():
     top_params_filename = os.environ['FUSESOC_TOP_PARAMS']
     with open(top_params_filename, 'r') as f:
-        top_params = yaml.load(f)
+        top_params = yaml.load(f.read(), Loader=yaml.Loader)
     return top_params
 
 
