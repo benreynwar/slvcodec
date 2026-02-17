@@ -16,6 +16,7 @@ import tempfile
 
 from xml.etree import cElementTree as ET
 import cocotb as true_cocotb
+from cocotb_tools.runner import Ghdl
 
 from slvcodec import add_slvcodec_files
 from slvcodec import filetestbench_generator, flatten_generator
@@ -673,48 +674,23 @@ def run_with_cocotb(generation_directory, filenames, entity_name, generics, test
 
 
 def run(vhdl_sources, simulation_args, toplevel, module, extra_env):
-    lib_dir = os.path.join(os.path.dirname(true_cocotb.__file__), 'libs')
-    shared_lib = os.path.join(lib_dir, 'libcocotbvpi_ghdl.so')
-    run_dir = ''
+    # Check if wave recording is requested
+    waves = any('--wave' in arg for arg in simulation_args) if simulation_args else False
+    # Filter out wave args from test_args (runner handles this via waves parameter)
+    test_args = [arg for arg in simulation_args if '--wave' not in arg] if simulation_args else []
 
-    for key, value in extra_env.items():
-        os.environ[key] = value
-
-    lib_dir_sep = os.pathsep + lib_dir + os.pathsep
-    if lib_dir_sep not in os.environ["PATH"]:  # without checking will add forever casing error
-        os.environ["PATH"] += lib_dir_sep
-
-    python_path = os.pathsep.join(sys.path)
-    os.environ["PYTHONPATH"] = os.pathsep + lib_dir
-
-    if run_dir:
-        os.environ["PYTHONPATH"] += os.pathsep + run_dir
-    os.environ["PYTHONPATH"] += os.pathsep + python_path
-
-    os.environ["TOPLEVEL"] = toplevel
-    os.environ["COCOTB_SIM"] = "1"
-    os.environ["MODULE"] = module
-    results_xml_file = tempfile.mkstemp('_cocotb_results')[1]
-    os.environ["COCOTB_RESULTS_FILE"] = results_xml_file
-    cmds = [['ghdl', '-i', filename] for filename in vhdl_sources]
-    cmds += [
-        ['ghdl', '-m', toplevel],
-        ['ghdl', '-r', toplevel, '--vpi='+shared_lib] + simulation_args,
-        ]
-    for cmd in cmds:
-        retval = subprocess.call(cmd)
-        assert retval == 0
-    # Check that the produced xml file by cocotb.
-
-    tree = ET.parse(results_xml_file)
-    for testsuite in tree.iter('testsuite'):
-        for testcase in testsuite.iter('testcase'):
-            for failure in testcase.iter("failure"):
-                msg = '{} class="{}" test="{}" error={}'.format(
-                    failure.get('message'), testcase.get('classname'),
-                    testcase.get('name'), failure.get('stdout'))
-                raise Exception(msg)
-    os.remove(results_xml_file)
+    runner = Ghdl()
+    runner.build(
+        sources=vhdl_sources,
+        hdl_toplevel=toplevel,
+    )
+    runner.test(
+        test_module=module,
+        hdl_toplevel=toplevel,
+        extra_env=extra_env,
+        test_args=test_args,
+        waves=waves,
+    )
 
 
 @cocotb.coroutine

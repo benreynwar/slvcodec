@@ -51,8 +51,8 @@ def set_value(dut, base_name, mapping, value, separator):
             # Check that we're not trying to assign something to a bundle
             # that isn't a list of dict.
             assert not isinstance(attribute, Bundle)
-            assert attribute.value.n_bits >= logceil_1to0(value)
-            attribute <= value
+            assert len(attribute.value) >= logceil_1to0(value)
+            attribute.value = value
         else:
             assert value in (0, None)
 
@@ -116,7 +116,7 @@ def get_width(dut, base_name, mapping, separator):
             else:
                 raise Exception('Missing {} signal in flattened entity.'.format(base_name))
         else:
-            value = getattr(dut, base_name).value.n_bits
+            value = len(getattr(dut, base_name).value)
     return value
 
 
@@ -139,7 +139,7 @@ def fork_make_input_and_output_files(directory, clk, dut, mapping, params,
                                      override_fork=None):
     input_port_names = params.get('input_port_names', [])
     output_port_names = params.get('output_port_names', [])
-    used_fork = cocotb.fork if override_fork is None else override_fork
+    used_fork = cocotb.start_soon if override_fork is None else override_fork
     if input_port_names and output_port_names:
         used_fork(make_input_and_output_files(
             clk=clk, dut=dut, mapping=mapping,

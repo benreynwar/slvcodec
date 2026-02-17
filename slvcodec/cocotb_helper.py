@@ -28,11 +28,14 @@ class TaskWrapper:
         self.helper.kill()
 
     def done(self):
-        return self.task._finished
+        if hasattr(self.task, 'done'):
+            return self.task.done()
+        else:
+            return self.task._finished
 
     @property
     def _finished(self):
-        return self.task._finished
+        return self.done()
 
     @property
     def _outcome(self):
@@ -105,7 +108,7 @@ class TaskHelper:
             forked_helper = TaskHelper(name=name)
             self.child_helpers.append(forked_helper)
             coroutine = needs_helper(forked_helper)
-            task = cocotb.fork(coroutine)
+            task = cocotb.start_soon(coroutine)
             return TaskWrapper(forked_helper, task)
         else:
             raise KilledError

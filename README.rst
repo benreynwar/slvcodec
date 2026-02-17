@@ -2,6 +2,12 @@
 slvcodec
 ========
 
+NOTE
+This project is not well maintained.  I'm making occasional bug fixes
+since I'm still using it for a project but I don't recommand it for
+new projects.  I would recommend building something on top of one of the
+solid python vhdl parsing projects that has come out sinced I create this.
+
 slvcodec is a tool that analyzes VHDL and generates:
 
   * Functions to convert arbitrary VHDL types to and from std_logic_vector.

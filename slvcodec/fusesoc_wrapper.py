@@ -132,11 +132,14 @@ def compile_src_files(work_root, src_files):
                      errormsg="Failed to analyze {}".format(file_name)).run()
 
 
-def elaborate(work_root, top_name):
+def elaborate(work_root, top_name, generics=None):
     '''
     Elaborate the design using ghdl.
     '''
-    Launcher('ghdl', ['-e', '--std=08']+[top_name],
+    args = []
+    for generic_name, generic_value in generics.items():
+        args.append('-g{}={}'.format(generic_name, generic_value))
+    Launcher('ghdl', ['-e', '--std=08'] + args + [top_name],
              cwd=work_root,
              errormsg="Failed to elaborate {}".format(top_name)).run()
 
@@ -230,7 +233,10 @@ def compile_elab_and_run(core_name, work_root, all_top_generics, top_params, top
         file_names = additional_generator(work_root, file_names)
     compile_src_files(work_root, other_files + file_names)
     if top_name is not None:
-        elaborate(work_root, top_name)
+        if all_top_generics:
+            elaborate(work_root, top_name, all_top_generics[0])
+        else:
+            elaborate(work_root, top_name)
         found_new_parameters = run(
             work_root, top_name, all_top_generics, generator_d)
     else:
