@@ -16,7 +16,7 @@ import tempfile
 
 from xml.etree import cElementTree as ET
 import cocotb as true_cocotb
-from cocotb_tools.runner import Ghdl
+from cocotb_tools.runner import Ghdl, check_results_file
 
 from slvcodec import add_slvcodec_files
 from slvcodec import filetestbench_generator, flatten_generator
@@ -684,13 +684,14 @@ def run(vhdl_sources, simulation_args, toplevel, module, extra_env):
         sources=vhdl_sources,
         hdl_toplevel=toplevel,
     )
-    runner.test(
+    results_xml = runner.test(
         test_module=module,
         hdl_toplevel=toplevel,
         extra_env=extra_env,
         test_args=test_args,
         waves=waves,
     )
+    check_results_file(results_xml)
 
 
 @cocotb.coroutine
